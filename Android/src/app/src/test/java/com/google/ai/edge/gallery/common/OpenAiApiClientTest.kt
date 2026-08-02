@@ -1,5 +1,6 @@
 package com.google.ai.edge.gallery.agent
 
+import com.google.gson.JsonParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -18,14 +19,18 @@ class OpenAiApiClientTest {
         OpenAiResponseRequest(
           model = "gpt-5.6-terra",
           instructions = "System first, personality second.",
-          messages =
+          inputItems =
             listOf(
-              OpenAiConversationMessage(
-                role = "user",
-                text = "What is here?",
-                imageDataUrls = listOf("data:image/jpeg;base64,abc"),
+              OpenAiInputJson.message(
+                OpenAiConversationMessage(
+                  role = "user",
+                  text = "What is here?",
+                  imageDataUrls = listOf("data:image/jpeg;base64,abc"),
+                )
               ),
-              OpenAiConversationMessage(role = "assistant", text = "A test image."),
+              OpenAiInputJson.message(
+                OpenAiConversationMessage(role = "assistant", text = "A test image.")
+              ),
             ),
           safetyIdentifier = "random-install-id",
         )
@@ -65,7 +70,12 @@ class OpenAiApiClientTest {
             OpenAiResponseRequest(
               model = "chat-latest",
               instructions = "",
-              messages = listOf(OpenAiConversationMessage(role = "user", text = "Hello")),
+              inputItems =
+                listOf(
+                  OpenAiInputJson.message(
+                    OpenAiConversationMessage(role = "user", text = "Hello")
+                  )
+                ),
               safetyIdentifier = "install-id",
             )
           )
@@ -77,10 +87,21 @@ class OpenAiApiClientTest {
   }
 
   @Test
-  fun streamingEventsExposeOnlyTextAndTerminalState() {
+  fun streamingEventsExposeTextOutputItemsAndTerminalState() {
     assertEquals(
       OpenAiStreamEvent.TextDelta("Hello"),
       OpenAiSseParser.parse("""{"type":"response.output_text.delta","delta":"Hello"}"""),
+    )
+    assertEquals(
+      OpenAiStreamEvent.OutputItemDone(
+        Json.parseToJsonElement(
+            """{"type":"function_call","call_id":"call_1","name":"loadSkill","arguments":"{}"}"""
+          )
+          .jsonObject
+      ),
+      OpenAiSseParser.parse(
+        """{"type":"response.output_item.done","item":{"type":"function_call","call_id":"call_1","name":"loadSkill","arguments":"{}"}}"""
+      ),
     )
     assertEquals(
       OpenAiStreamEvent.Completed,
@@ -91,6 +112,49 @@ class OpenAiApiClientTest {
       OpenAiSseParser.parse(
         """{"type":"response.failed","response":{"error":{"message":"No access"}}}"""
       ),
+    )
+  }
+
+  @Test
+  fun requestFlattensLiteRtToolsAndKeepsToolOutputsInInput() {
+    val liteRtDescriptions =
+      JsonParser.parseString(
+          """[{"type":"function","function":{"name":"loadSkill","description":"Loads a skill.","parameters":{"type":"object","properties":{"skillName":{"type":"string"}}}}}]"""
+        )
+        .asJsonArray
+    val tools = OpenAiToolJson.fromLiteRtDescriptions(liteRtDescriptions)
+
+    val encoded =
+      OpenAiRequestJson.encode(
+        OpenAiResponseRequest(
+          model = "gpt-5.6-sol",
+          instructions = "Use tools when needed.",
+          inputItems =
+            listOf(
+              OpenAiInputJson.message(OpenAiConversationMessage(role = "user", text = "Load it")),
+              OpenAiInputJson.functionCallOutput(callId = "call_1", output = "loaded"),
+            ),
+          safetyIdentifier = "install-id",
+          tools = tools,
+        )
+      )
+
+    val root = Json.parseToJsonElement(encoded).jsonObject
+    assertFalse(root.getValue("parallel_tool_calls").jsonPrimitive.boolean)
+    val tool = root.getValue("tools").jsonArray.single().jsonObject
+    assertEquals("function", tool.getValue("type").jsonPrimitive.content)
+    assertEquals("loadSkill", tool.getValue("name").jsonPrimitive.content)
+    assertFalse(tool.getValue("strict").jsonPrimitive.boolean)
+    assertFalse(tool.containsKey("function"))
+    assertEquals(
+      "function_call_output",
+      root
+        .getValue("input")
+        .jsonArray[1]
+        .jsonObject
+        .getValue("type")
+        .jsonPrimitive
+        .content,
     )
   }
 }

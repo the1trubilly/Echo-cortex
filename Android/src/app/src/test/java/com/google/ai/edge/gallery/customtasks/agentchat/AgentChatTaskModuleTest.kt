@@ -46,4 +46,10 @@ class AgentChatTaskModuleTest {
       getEffectiveBaseSystemPrompt(customPrompt, hasMcpTools = false),
     )
   }
+
+  @Test
+  fun defaultPrompt_makesMemoryUseAutomaticButExcludesSecrets() {
+    assertTrue(DEFAULT_SYSTEM_PROMPT_TRIMMED.contains("Memory behavior is automatic"))
+    assertTrue(DEFAULT_SYSTEM_PROMPT_TRIMMED.contains("Do not store authentication secrets"))
+  }
 }

@@ -105,7 +105,7 @@
         {name: 'workflow_planner', state: 'prototype_ready', surface: 'skill'},
         {name: 'capability_gate', state: 'prototype_ready', surface: 'skill'},
         {name: 'trace_and_reflection', state: 'prototype_ready', surface: 'skill'},
-        {name: 'tool_execution_loop', state: 'app_required', surface: 'runtime'},
+        {name: 'tool_execution_loop', state: 'runtime_ready', surface: 'openai_and_local'},
         {name: 'markdown_memory_vault', state: 'app_required', surface: 'native_storage'},
         {name: 'semantic_memory_lattice', state: 'research_planned', surface: 'memory_service'},
         {name: 'scheduler_and_proactive_agents', state: 'app_required', surface: 'background_service'},

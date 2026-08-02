@@ -2,8 +2,13 @@ package com.google.ai.edge.gallery.agent
 
 import android.content.Context
 import android.graphics.Bitmap
+import com.google.ai.edge.gallery.customtasks.agentchat.AgentTools
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.OpenAiCredentialsRepository
+import com.google.ai.edge.gallery.tools.RuntimeToolDispatcher
+import com.google.ai.edge.gallery.tools.ToolExecutionContext
+import com.google.ai.edge.litertlm.ToolManager
+import com.google.gson.JsonParser
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 import javax.inject.Inject
@@ -14,8 +19,18 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 private object OpenAiSessionMarker
+private const val MAX_TOOL_ROUNDS = 12
+
+private data class OpenAiFunctionCall(
+  val callId: String,
+  val name: String,
+  val arguments: String,
+)
 
 @Singleton
 class OpenAiAgentRuntimeExecutor
@@ -23,10 +38,13 @@ class OpenAiAgentRuntimeExecutor
 constructor(
   private val credentialsRepository: OpenAiCredentialsRepository,
   private val apiClient: OpenAiApiClient,
+  private val agentTools: AgentTools,
 ) : AgentRuntimeExecutor {
   private var model: Model? = null
   private var systemInstruction: String = ""
-  private val conversation = mutableListOf<OpenAiConversationMessage>()
+  private var toolExecutionContext: ToolExecutionContext? = null
+  private val toolDispatcher = RuntimeToolDispatcher()
+  private val conversationItems = mutableListOf<JsonObject>()
 
   override suspend fun initialize(
     context: Context,
@@ -40,7 +58,9 @@ constructor(
 
     model = config.model
     systemInstruction = config.systemInstruction.orEmpty()
-    synchronized(conversation) { conversation.clear() }
+    toolExecutionContext =
+      ToolExecutionContext(taskId = config.taskId, actionChannel = config.actionChannel)
+    synchronized(conversationItems) { conversationItems.clear() }
     config.model.instance = OpenAiSessionMarker
     onDone("")
   }
@@ -71,50 +91,100 @@ constructor(
 
     val job =
       launch(Dispatchers.IO) {
-        var userMessage: OpenAiConversationMessage? = null
+        var turnStartIndex = -1
         try {
           val imageDataUrls =
             request.attachments.filterIsInstance<Attachment.ImageBitmap>().map { image ->
               image.bitmap.toJpegDataUrl()
             }
-          userMessage =
-            OpenAiConversationMessage(
-              role = "user",
-              text = request.query,
-              imageDataUrls = imageDataUrls,
+          val userItem =
+            OpenAiInputJson.message(
+              OpenAiConversationMessage(
+                role = "user",
+                text = request.query,
+                imageDataUrls = imageDataUrls,
+              )
             )
-          val requestMessages =
-            synchronized(conversation) {
-              conversation.add(userMessage)
-              conversation.toList()
+
+          synchronized(conversationItems) {
+            turnStartIndex = conversationItems.size
+            conversationItems.add(userItem)
+          }
+
+          val availableTools = agentTools.getAvailableTools()
+          toolExecutionContext?.let { executionContext ->
+            toolDispatcher.setupExecutionContext(availableTools, executionContext)
+          }
+          val toolManager = ToolManager(agentTools.getLiteRtToolProviders())
+          val openAiTools = OpenAiToolJson.fromLiteRtDescriptions(toolManager.getToolsDescription())
+          val visibleText = StringBuilder()
+          var completedTurn = false
+
+          toolLoop@ for (round in 0 until MAX_TOOL_ROUNDS) {
+            val requestItems = synchronized(conversationItems) { conversationItems.toList() }
+            val response =
+              apiClient.streamResponse(
+                apiKey = apiKey,
+                request =
+                  OpenAiResponseRequest(
+                    model = currentModel.name,
+                    instructions = systemInstruction,
+                    inputItems = requestItems,
+                    safetyIdentifier = credentialsRepository.getOrCreateSafetyIdentifier(),
+                    tools = openAiTools,
+                  ),
+                onTextDelta = { delta ->
+                  visibleText.append(delta)
+                  trySend(AgentEvent.StreamToken(token = delta, done = false))
+                },
+              )
+
+            val outputItems =
+              response.outputItems.ifEmpty {
+                if (response.text.isEmpty()) emptyList()
+                else
+                  listOf(
+                    OpenAiInputJson.message(
+                      OpenAiConversationMessage(role = "assistant", text = response.text)
+                    )
+                  )
+              }
+            synchronized(conversationItems) { conversationItems.addAll(outputItems) }
+
+            val functionCalls = response.outputItems.mapNotNull(::parseFunctionCall)
+            if (functionCalls.isEmpty()) {
+              completedTurn = true
+              break@toolLoop
             }
 
-          val finalText =
-            apiClient.streamResponse(
-              apiKey = apiKey,
-              request =
-                OpenAiResponseRequest(
-                  model = currentModel.name,
-                  instructions = systemInstruction,
-                  messages = requestMessages,
-                  safetyIdentifier = credentialsRepository.getOrCreateSafetyIdentifier(),
-                ),
-              onTextDelta = { delta ->
-                trySend(AgentEvent.StreamToken(token = delta, done = false))
-              },
-            )
-
-          synchronized(conversation) {
-            conversation.add(OpenAiConversationMessage(role = "assistant", text = finalText))
+            functionCalls.forEach { functionCall ->
+              val output = executeToolCall(toolManager, functionCall)
+              synchronized(conversationItems) {
+                conversationItems.add(
+                  OpenAiInputJson.functionCallOutput(
+                    callId = functionCall.callId,
+                    output = output,
+                  )
+                )
+              }
+            }
           }
+
+          if (!completedTurn) {
+            throw IllegalStateException(
+              "Jarvis stopped after $MAX_TOOL_ROUNDS tool steps to prevent a runaway loop."
+            )
+          }
+
+          val finalText = visibleText.toString()
           trySend(AgentEvent.StreamToken(token = "", done = true))
           trySend(AgentEvent.LoopTerminated(finalResponse = finalText))
         } catch (cancelled: CancellationException) {
-          removeFailedTurn(userMessage)
+          removeFailedTurn(turnStartIndex)
           trySend(AgentEvent.LoopCancelled)
           throw cancelled
         } catch (error: Exception) {
-          removeFailedTurn(userMessage)
+          removeFailedTurn(turnStartIndex)
           trySend(AgentEvent.Error(error.message ?: "OpenAI request failed."))
         } finally {
           close()
@@ -152,17 +222,19 @@ constructor(
   ) {
     apiClient.cancel()
     this.systemInstruction = systemInstruction.orEmpty()
-    synchronized(conversation) {
-      conversation.clear()
-      conversation.addAll(
+    synchronized(conversationItems) {
+      conversationItems.clear()
+      conversationItems.addAll(
         messages.map { message ->
-          OpenAiConversationMessage(
-            role =
-              when (message.role) {
-                AgentConversationRole.USER -> "user"
-                AgentConversationRole.ASSISTANT -> "assistant"
-              },
-            text = message.content,
+          OpenAiInputJson.message(
+            OpenAiConversationMessage(
+              role =
+                when (message.role) {
+                  AgentConversationRole.USER -> "user"
+                  AgentConversationRole.ASSISTANT -> "assistant"
+                },
+              text = message.content,
+            )
           )
         }
       )
@@ -178,15 +250,47 @@ constructor(
     model?.instance = null
     model = null
     systemInstruction = ""
-    synchronized(conversation) { conversation.clear() }
+    toolExecutionContext = null
+    synchronized(conversationItems) { conversationItems.clear() }
     onDone()
   }
 
-  private fun removeFailedTurn(userMessage: OpenAiConversationMessage?) {
-    if (userMessage == null) return
-    synchronized(conversation) {
-      val index = conversation.indexOfLast { it === userMessage }
-      if (index >= 0) conversation.removeAt(index)
+  private suspend fun executeToolCall(
+    toolManager: ToolManager,
+    functionCall: OpenAiFunctionCall,
+  ): String {
+    return try {
+      val arguments = JsonParser.parseString(functionCall.arguments).asJsonObject
+      val result =
+        toolDispatcher.dispatchManualCall(
+          toolManager = toolManager,
+          functionName = functionCall.name,
+          arguments = arguments,
+        )
+      if (result.isJsonPrimitive && result.asJsonPrimitive.isString) result.asString
+      else result.toString()
+    } catch (cancelled: CancellationException) {
+      throw cancelled
+    } catch (_: Exception) {
+      "{\"error\":\"Tool execution failed.\"}"
+    }
+  }
+
+  private fun parseFunctionCall(item: JsonObject): OpenAiFunctionCall? {
+    if (item["type"]?.jsonPrimitive?.contentOrNull != "function_call") return null
+    val callId = item["call_id"]?.jsonPrimitive?.contentOrNull.orEmpty()
+    val name = item["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
+    val arguments = item["arguments"]?.jsonPrimitive?.contentOrNull.orEmpty()
+    if (callId.isBlank() || name.isBlank()) return null
+    return OpenAiFunctionCall(callId = callId, name = name, arguments = arguments)
+  }
+
+  private fun removeFailedTurn(turnStartIndex: Int) {
+    if (turnStartIndex < 0) return
+    synchronized(conversationItems) {
+      if (turnStartIndex <= conversationItems.size) {
+        conversationItems.subList(turnStartIndex, conversationItems.size).clear()
+      }
     }
   }
 

@@ -47,7 +47,8 @@ class JarvisRuntimeSelfModelTest {
     assertTrue(result.contains("Current accepted inputs: text, images"))
     assertTrue(result.contains("Enabled Skills: calendar, research"))
     assertTrue(result.contains("Enabled MCP tools: search_web"))
-    assertTrue(result.contains("does not yet implement the Skills/MCP function-call round trip"))
+    assertTrue(result.contains("OpenAI Responses function calls run through"))
+    assertTrue(result.contains("Tool results are returned to the model"))
     assertTrue(result.indexOf("## Saved Personality Prompt") < result.indexOf(JarvisRuntimeSelfModel.SECTION_HEADER))
   }
 

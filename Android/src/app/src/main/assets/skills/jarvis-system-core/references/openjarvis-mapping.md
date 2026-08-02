@@ -7,7 +7,7 @@ This skill is an original, minimal prototype informed by the public OpenJarvis a
 | Intelligence | Provider and exact model fields in the typed plan | Existing provider-neutral model picker and runtime router |
 | Engine | Runtime identity in the typed plan | `AgentRuntimeExecutor` and provider implementations |
 | Agents | Simple/tool-aware strategy plus phased decomposition | A native orchestrator around the unified chat session |
-| Tools & Memory | Available-tool inventory, capability checks, supplied memory summaries | Tool-call loop, native capability broker, ThreadKeeper migration, Markdown vault, derived retrieval indexes |
+| Tools & Memory | Available-tool inventory, capability checks, supplied memory summaries | Shared tool-call loop, native capability broker, ThreadKeeper migration, Markdown vault, derived retrieval indexes |
 | Learning | Typed traces, feedback, and proposal-only reflection | Durable trace store, evaluations, approval-gated improvement pipeline |
 
 ## Deliberate boundaries
@@ -20,7 +20,7 @@ This skill is an original, minimal prototype informed by the public OpenJarvis a
 
 ## Planned sequence
 
-1. Implement the OpenAI Responses tool-call loop so cloud and local models share one capability contract.
+1. **Complete:** map OpenAI Responses function calls into the same Skill/MCP dispatcher used by local models.
 2. Add a native trace collector around model, retrieval, tool, and response events.
 3. Lift ThreadKeeper's useful record/link/checkpoint concepts into a native, app-isolated memory service.
 4. Make canonical memories Markdown files in an Obsidian-compatible vault; treat embeddings and indexes as rebuildable derivatives.

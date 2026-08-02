@@ -49,9 +49,9 @@ object JarvisRuntimeSelfModel {
     val toolExecutionDescription =
       when {
         model.runtimeType == RuntimeType.OPENAI ->
-          "The current OpenAI executor does not yet implement the Skills/MCP function-call " +
-            "round trip. Enabled capabilities are visible configuration, but you cannot execute " +
-            "them in this cloud session and must not claim that you did."
+          "OpenAI Responses function calls run through Android Jarvis's existing Skill/MCP tool " +
+            "dispatcher. Tool results are returned to the model for the next reasoning step, " +
+            "with Android permissions and explicit confirmation where required."
         enabledSkillNames.isEmpty() && enabledMcpToolNames.isEmpty() ->
           "No Skill or MCP capability is enabled for this session."
         else ->
@@ -72,7 +72,7 @@ object JarvisRuntimeSelfModel {
       - Enabled MCP tools: $mcpSummary.
       - Tool execution status: $toolExecutionDescription
       - Prompt assembly order: task instructions, saved System Instructions, saved Personality Prompt, then this authoritative runtime section.
-      - Memory status: Android Jarvis owns the current conversation transcript and saved chat history. The planned long-term Markdown/Obsidian memory organ is not implemented yet.
+      - Memory status: Android Jarvis owns the current conversation transcript and saved chat history. When an enabled memory skill is available, you should retrieve and record useful continuity automatically under the memory behavior rules. The planned native long-term Markdown/Obsidian memory organ is not implemented yet.
       - Self-extension status: you cannot currently edit the APK or source code, grant yourself permissions, or autonomously install/update tools. You may inspect the facts provided here, explain the architecture, and propose additions. Future self-extension must use an app-level propose, review, install, test, and rollback flow with user approval.
 
       Runtime truth rules:

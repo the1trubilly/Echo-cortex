@@ -5,6 +5,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.google.gson.JsonArray as GsonJsonArray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -29,9 +30,85 @@ data class OpenAiConversationMessage(
 data class OpenAiResponseRequest(
   val model: String,
   val instructions: String,
-  val messages: List<OpenAiConversationMessage>,
+  val inputItems: List<JsonObject>,
   val safetyIdentifier: String,
+  val tools: List<JsonObject> = emptyList(),
 )
+
+internal object OpenAiInputJson {
+  fun message(message: OpenAiConversationMessage): JsonObject =
+    buildJsonObject {
+      put("role", message.role)
+      if (message.imageDataUrls.isEmpty()) {
+        put("content", message.text)
+      } else {
+        put(
+          "content",
+          buildJsonArray {
+            if (message.text.isNotEmpty()) {
+              add(
+                buildJsonObject {
+                  put("type", "input_text")
+                  put("text", message.text)
+                }
+              )
+            }
+            message.imageDataUrls.forEach { imageDataUrl ->
+              add(
+                buildJsonObject {
+                  put("type", "input_image")
+                  put("image_url", imageDataUrl)
+                }
+              )
+            }
+          },
+        )
+      }
+    }
+
+  fun functionCallOutput(callId: String, output: String): JsonObject =
+    buildJsonObject {
+      put("type", "function_call_output")
+      put("call_id", callId)
+      put("output", output)
+    }
+}
+
+/** Adapts LiteRT-LM's Chat Completions-style descriptions to Responses function tools. */
+internal object OpenAiToolJson {
+  fun fromLiteRtDescriptions(descriptions: GsonJsonArray): List<JsonObject> =
+    descriptions.mapNotNull { description ->
+      val wrapper = description.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
+      val function =
+        wrapper.get("function")?.takeIf { it.isJsonObject }?.asJsonObject
+          ?: wrapper.takeIf { it.has("name") }
+          ?: return@mapNotNull null
+      val name = function.get("name")?.takeIf { it.isJsonPrimitive }?.asString
+      if (name.isNullOrBlank()) return@mapNotNull null
+
+      val parameters =
+        function.get("parameters")
+          ?.let { value ->
+            try {
+              Json.parseToJsonElement(value.toString()).jsonObject
+            } catch (_: Exception) {
+              null
+            }
+          }
+          ?: buildJsonObject { put("type", "object") }
+
+      buildJsonObject {
+        put("type", "function")
+        put("name", name)
+        function.get("description")?.takeIf { it.isJsonPrimitive }?.asString?.let {
+          descriptionText -> put("description", descriptionText)
+        }
+        put("parameters", parameters)
+        // Existing LiteRT tool schemas do not all satisfy OpenAI strict-mode requirements.
+        put("strict", false)
+      }
+    }
+}
 
 internal object OpenAiRequestJson {
   fun encode(request: OpenAiResponseRequest): String =
@@ -45,41 +122,20 @@ internal object OpenAiRequestJson {
         if (request.model.startsWith("gpt-5.6")) {
           putJsonObject("reasoning") { put("effort", "medium") }
         }
-        putJsonArray("input") {
-          request.messages.forEach { message -> add(encodeMessage(message)) }
+        putJsonArray("input") { request.inputItems.forEach(::add) }
+        if (request.tools.isNotEmpty()) {
+          putJsonArray("tools") { request.tools.forEach(::add) }
+          // Mobile permission prompts and WebView skill execution must happen in a stable order.
+          put("parallel_tool_calls", false)
         }
       }
       .toString()
-
-  private fun encodeMessage(message: OpenAiConversationMessage): JsonObject =
-    buildJsonObject {
-      put("role", message.role)
-      if (message.imageDataUrls.isEmpty()) {
-        put("content", message.text)
-      } else {
-        put(
-          "content",
-          buildJsonArray {
-            if (message.text.isNotEmpty()) {
-              add(buildJsonObject {
-                put("type", "input_text")
-                put("text", message.text)
-              })
-            }
-            message.imageDataUrls.forEach { imageDataUrl ->
-              add(buildJsonObject {
-                put("type", "input_image")
-                put("image_url", imageDataUrl)
-              })
-            }
-          },
-        )
-      }
-    }
 }
 
 internal sealed interface OpenAiStreamEvent {
   data class TextDelta(val text: String) : OpenAiStreamEvent
+
+  data class OutputItemDone(val item: JsonObject) : OpenAiStreamEvent
 
   data object Completed : OpenAiStreamEvent
 
@@ -104,6 +160,14 @@ internal object OpenAiSseParser {
       "response.output_text.delta",
       "response.refusal.delta" ->
         OpenAiStreamEvent.TextDelta(event["delta"]?.jsonPrimitive?.contentOrNull.orEmpty())
+      "response.output_item.done" ->
+        event["item"]?.let { item ->
+          try {
+            OpenAiStreamEvent.OutputItemDone(item.jsonObject)
+          } catch (_: Exception) {
+            OpenAiStreamEvent.Error("OpenAI returned an unreadable output item.")
+          }
+        } ?: OpenAiStreamEvent.Error("OpenAI returned an empty output item.")
       "response.completed" -> OpenAiStreamEvent.Completed
       "response.failed" ->
         OpenAiStreamEvent.Error(
@@ -128,6 +192,8 @@ internal object OpenAiSseParser {
 
 class OpenAiApiException(val statusCode: Int, message: String) : IOException(message)
 
+data class OpenAiResponseResult(val text: String, val outputItems: List<JsonObject>)
+
 @Singleton
 class OpenAiApiClient @Inject constructor() {
   @Volatile private var activeConnection: HttpURLConnection? = null
@@ -136,7 +202,7 @@ class OpenAiApiClient @Inject constructor() {
     apiKey: String,
     request: OpenAiResponseRequest,
     onTextDelta: (String) -> Unit,
-  ): String =
+  ): OpenAiResponseResult =
     withContext(Dispatchers.IO) {
       val connection =
         (URL(RESPONSES_URL).openConnection() as HttpURLConnection).apply {
@@ -163,6 +229,7 @@ class OpenAiApiClient @Inject constructor() {
         }
 
         val finalText = StringBuilder()
+        val outputItems = mutableListOf<JsonObject>()
         var completed = false
         val eventData = mutableListOf<String>()
 
@@ -175,6 +242,7 @@ class OpenAiApiClient @Inject constructor() {
                 onTextDelta(event.text)
               }
             }
+            is OpenAiStreamEvent.OutputItemDone -> outputItems.add(event.item)
             OpenAiStreamEvent.Completed -> completed = true
             is OpenAiStreamEvent.Error -> throw IOException(event.message)
             OpenAiStreamEvent.Ignored -> Unit
@@ -196,7 +264,7 @@ class OpenAiApiClient @Inject constructor() {
         handleEvent()
 
         if (!completed) throw IOException("The OpenAI connection ended before the response finished.")
-        finalText.toString()
+        OpenAiResponseResult(text = finalText.toString(), outputItems = outputItems)
       } finally {
         activeConnection = null
         connection.disconnect()
