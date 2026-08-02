@@ -23,7 +23,6 @@ import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.ai.edge.gallery.AppLifecycleProvider
-import com.google.ai.edge.gallery.BuildConfig
 import com.google.ai.edge.gallery.R
 import com.google.ai.edge.gallery.common.ProjectConfig
 import com.google.ai.edge.gallery.common.SystemPromptHelper
@@ -47,6 +46,7 @@ import com.google.ai.edge.gallery.data.ModelDownloadStatus
 import com.google.ai.edge.gallery.data.ModelDownloadStatusType
 import com.google.ai.edge.gallery.data.NumberSliderConfig
 import com.google.ai.edge.gallery.data.RuntimeType
+import com.google.ai.edge.gallery.data.SavedPrompts
 import com.google.ai.edge.gallery.data.SOC
 import com.google.ai.edge.gallery.data.SystemPromptRepository
 import com.google.ai.edge.gallery.data.TMP_FILE_EXT
@@ -75,8 +75,10 @@ import kotlin.collections.sortedWith
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import net.openid.appauth.AuthorizationException
 import net.openid.appauth.AuthorizationRequest
@@ -88,6 +90,8 @@ private const val TAG = "AGModelManagerViewModel"
 private const val TEXT_INPUT_HISTORY_MAX_SIZE = 50
 private const val MODEL_ALLOWLIST_FILENAME = "model_allowlist.json"
 private const val MODEL_ALLOWLIST_TEST_FILENAME = "model_allowlist_test.json"
+// The upstream catalog currently ships independently of the app's version name.
+private const val MODEL_ALLOWLIST_VERSION = "1_0_15"
 private const val ALLOWLIST_BASE_URL =
   "https://raw.githubusercontent.com/google-ai-edge/gallery/refs/heads/main/model_allowlists"
 
@@ -654,6 +658,17 @@ constructor(
     firebaseAnalytics?.setAnalyticsCollectionEnabled(enabled)
   }
 
+  fun readSavedPrompts(): SavedPrompts {
+    return runBlocking { systemPromptRepository.getSavedPrompts().first() }
+  }
+
+  suspend fun saveSavedPrompts(systemInstructions: String, personalityPrompt: String) {
+    systemPromptRepository.updateSavedPrompts(
+      systemInstructions = systemInstructions,
+      personalityPrompt = personalityPrompt,
+    )
+  }
+
   fun getModelUrlResponse(model: Model, accessToken: String? = null): Int {
     try {
       if (model.url.isEmpty()) {
@@ -971,8 +986,7 @@ constructor(
 
         if (modelAllowlist == null) {
           // Load from github.
-          var version = BuildConfig.VERSION_NAME.replace(".", "_")
-          val url = getAllowlistUrl(version)
+          val url = getAllowlistUrl(MODEL_ALLOWLIST_VERSION)
           Log.d(TAG, "Loading model allowlist from internet. Url: $url")
           val data = getJsonResponse<ModelAllowlist>(url = url)
           modelAllowlist = data?.jsonObj

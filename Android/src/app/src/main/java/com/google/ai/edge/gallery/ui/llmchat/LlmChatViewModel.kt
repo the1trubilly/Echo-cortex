@@ -91,7 +91,7 @@ open class LlmChatViewModelBase(
   fun loadSystemPrompt(task: Task) {
     viewModelScope.launch {
       val effectivePrompt =
-        SystemPromptHelper.getEffectiveSystemPrompt(systemPromptRepository, task)
+        SystemPromptHelper.getTaskSystemPrompt(systemPromptRepository, task)
       _uiSystemPrompt.value = effectivePrompt
     }
   }
@@ -117,10 +117,12 @@ open class LlmChatViewModelBase(
     _uiSystemPrompt.value = newPrompt
     viewModelScope.launch {
       systemPromptRepository?.updateSystemPrompt(task.id, newPrompt)
+      val effectivePrompt =
+        SystemPromptHelper.getEffectiveSystemPrompt(systemPromptRepository, task)
       resetSession(
         task = task,
         model = model,
-        systemInstruction = Contents.of(newPrompt),
+        systemInstruction = Contents.of(effectivePrompt),
         supportImage = true,
         supportAudio = true,
         onDone = { addMessage(model, ChatMessageInfo(content = systemPromptUpdatedMessage)) },

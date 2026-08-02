@@ -50,6 +50,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MultiChoiceSegmentedButtonRow
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.Switch
@@ -58,6 +59,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,6 +89,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.min
+import kotlinx.coroutines.launch
 
 private val THEME_OPTIONS = listOf(Theme.THEME_AUTO, Theme.THEME_LIGHT, Theme.THEME_DARK)
 
@@ -111,6 +114,16 @@ fun SettingsDialog(
   val focusRequester = remember { FocusRequester() }
   val interactionSource = remember { MutableInteractionSource() }
   var showTos by remember { mutableStateOf(false) }
+  val initialSavedPrompts = remember { modelManagerViewModel.readSavedPrompts() }
+  var systemInstructions by remember { mutableStateOf(initialSavedPrompts.systemInstructions) }
+  var personalityPrompt by remember { mutableStateOf(initialSavedPrompts.personalityPrompt) }
+  var savedSystemInstructions by remember {
+    mutableStateOf(initialSavedPrompts.systemInstructions)
+  }
+  var savedPersonalityPrompt by remember { mutableStateOf(initialSavedPrompts.personalityPrompt) }
+  var promptsSaved by remember { mutableStateOf(false) }
+  var savingPrompts by remember { mutableStateOf(false) }
+  val coroutineScope = rememberCoroutineScope()
 
   Dialog(onDismissRequest = onDismissed) {
     val focusManager = LocalFocusManager.current
@@ -219,6 +232,83 @@ fun SettingsDialog(
                 },
               )
             }
+
+          Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            Text(
+              stringResource(R.string.settings_saved_prompts_title),
+              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium),
+            )
+            Text(
+              stringResource(R.string.settings_saved_prompts_description),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+              value = systemInstructions,
+              onValueChange = {
+                systemInstructions = it
+                promptsSaved = false
+              },
+              label = { Text(stringResource(R.string.system_instructions_label)) },
+              supportingText = {
+                Text(stringResource(R.string.system_instructions_description))
+              },
+              modifier = Modifier.fillMaxWidth(),
+              minLines = 3,
+              maxLines = 6,
+            )
+            OutlinedTextField(
+              value = personalityPrompt,
+              onValueChange = {
+                personalityPrompt = it
+                promptsSaved = false
+              },
+              label = { Text(stringResource(R.string.personality_prompt_label)) },
+              supportingText = {
+                Text(stringResource(R.string.personality_prompt_description))
+              },
+              modifier = Modifier.fillMaxWidth(),
+              minLines = 3,
+              maxLines = 6,
+            )
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Button(
+                enabled =
+                  !savingPrompts &&
+                    (systemInstructions != savedSystemInstructions ||
+                      personalityPrompt != savedPersonalityPrompt),
+                onClick = {
+                  savingPrompts = true
+                  coroutineScope.launch {
+                    modelManagerViewModel.saveSavedPrompts(
+                      systemInstructions = systemInstructions,
+                      personalityPrompt = personalityPrompt,
+                    )
+                    savedSystemInstructions = systemInstructions
+                    savedPersonalityPrompt = personalityPrompt
+                    promptsSaved = true
+                    savingPrompts = false
+                  }
+                },
+              ) {
+                Text(stringResource(R.string.save_prompts))
+              }
+              if (promptsSaved) {
+                Text(
+                  stringResource(R.string.prompts_saved_locally),
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.primary,
+                )
+              }
+            }
+          }
 
           // HF Token management.
           Column(

@@ -588,7 +588,7 @@ private fun AppTitle(enableAnimation: Boolean) {
       animationDurationMs = if (enableAnimation) TITLE_FIRST_LINE_ANIMATION_DURATION else 0,
     )
   }
-  // Second line text "Edge Gallery" and its animation.
+  // Second line app title and its animation.
   //
   // The initial animation is the same as the first line text. Right before it is done, the final
   // text with a gradient is revealed.
@@ -629,8 +629,8 @@ private fun AppTitle(enableAnimation: Boolean) {
 
 @Composable
 fun AppTitleGm4(enableAnimation: Boolean) {
-  val text1 = "Google"
-  val text2 = "AI Edge Gallery"
+  val text1 = "Android"
+  val text2 = "Jarvis"
   val annotatedText = buildAnnotatedString {
     withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurface)) { append(text1) }
     append(" ")

@@ -27,6 +27,7 @@ import com.google.ai.edge.gallery.agent.AgentRuntimeConfig
 import com.google.ai.edge.gallery.agent.AgentRuntimeExecutor
 import com.google.ai.edge.gallery.agent.DefaultAgentRuntimeExecutor
 import com.google.ai.edge.gallery.agent.PromptExpander
+import com.google.ai.edge.gallery.common.SystemPromptHelper
 import com.google.ai.edge.gallery.customtasks.common.CustomTask
 import com.google.ai.edge.gallery.customtasks.common.CustomTaskDataForBuiltinTask
 import com.google.ai.edge.gallery.data.BuiltInTaskId
@@ -268,9 +269,17 @@ fun isDefaultSystemPrompt(prompt: String): Boolean {
 
 // Returns the effective default system prompt depending on whether MCP tools are enabled.
 fun getEffectiveBaseSystemPrompt(currentPrompt: String, hasMcpTools: Boolean): String {
-  return if (isDefaultSystemPrompt(currentPrompt)) {
+  val defaultPromptPrefix =
+    listOf(DEFAULT_SYSTEM_PROMPT_TRIMMED, DEFAULT_SYSTEM_PROMPT_SKILLS_ONLY_TRIMMED).firstOrNull {
+      defaultPrompt ->
+      currentPrompt == defaultPrompt ||
+        currentPrompt.removePrefix(defaultPrompt).let { suffix ->
+          suffix.startsWith("\n\n${SystemPromptHelper.SYSTEM_INSTRUCTIONS_HEADER}\n") ||
+            suffix.startsWith("\n\n${SystemPromptHelper.PERSONALITY_PROMPT_HEADER}\n")
+        }
+    } ?: return currentPrompt
+
+  val effectiveDefault =
     if (hasMcpTools) DEFAULT_SYSTEM_PROMPT_TRIMMED else DEFAULT_SYSTEM_PROMPT_SKILLS_ONLY_TRIMMED
-  } else {
-    currentPrompt
-  }
+  return effectiveDefault + currentPrompt.removePrefix(defaultPromptPrefix)
 }

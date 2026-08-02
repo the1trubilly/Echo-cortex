@@ -17,17 +17,26 @@
 package com.google.ai.edge.gallery.data
 
 import androidx.datastore.core.DataStore
+import com.google.ai.edge.gallery.proto.Settings
 import com.google.ai.edge.gallery.proto.UserData
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-/** Repository for managing custom system prompts per task. */
+data class SavedPrompts(
+  val systemInstructions: String = "",
+  val personalityPrompt: String = "",
+)
+
+/** Repository for managing per-task prompts and Android Jarvis's global saved prompts. */
 @Singleton
 open class SystemPromptRepository
 @Inject
-constructor(private val userDataDataStore: DataStore<UserData>) {
+constructor(
+  private val userDataDataStore: DataStore<UserData>,
+  private val settingsDataStore: DataStore<Settings>,
+) {
 
   private fun getKey(taskId: String): String = "system_prompt_$taskId"
 
@@ -58,6 +67,27 @@ constructor(private val userDataDataStore: DataStore<UserData>) {
    */
   open fun getCustomSystemPrompt(taskId: String): Flow<String?> {
     return userDataDataStore.data.map { it.secretsMap[getKey(taskId)] }
+  }
+
+  /** Returns the two independently stored global prompt settings. */
+  open fun getSavedPrompts(): Flow<SavedPrompts> {
+    return settingsDataStore.data.map { settings ->
+      SavedPrompts(
+        systemInstructions = settings.systemInstructions,
+        personalityPrompt = settings.personalityPrompt,
+      )
+    }
+  }
+
+  /** Saves both prompt settings as separate protobuf fields in one atomic DataStore update. */
+  suspend fun updateSavedPrompts(systemInstructions: String, personalityPrompt: String) {
+    settingsDataStore.updateData { settings ->
+      settings
+        .toBuilder()
+        .setSystemInstructions(systemInstructions)
+        .setPersonalityPrompt(personalityPrompt)
+        .build()
+    }
   }
 
   /**

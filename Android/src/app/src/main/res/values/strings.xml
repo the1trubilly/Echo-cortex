@@ -28,15 +28,15 @@
   <string name="aichat_initializing_title" translatable="true" description="Status indicator when initializing model. [CHAR_LIMIT=18]">Initializing model</string>
   <string name="aichat_initializing_content" translatable="true" description="Loading message shown while a chat or translator session is initializing. [CHAR_LIMIT=41]">Sit tight, this can take up to 1 minute</string>
   <string name="app_intro" translatable="true" description="Introduction text shown on the home screen. [CHAR_LIMIT=50]">Explore a world of amazing on-device models from</string>
-  <string name="app_name" translatable="false">Google AI Edge Gallery</string>
-  <string name="app_name_first_part" translatable="false">Google AI</string>
-  <string name="app_name_second_part" translatable="false">Edge Gallery</string>
+  <string name="app_name" translatable="false">Android Jarvis</string>
+  <string name="app_name_first_part" translatable="false">Android</string>
+  <string name="app_name_second_part" translatable="false">Jarvis</string>
   <string name="askimage_emptystate_title" translatable="false">Ask Image</string>
   <string name="askimage_emptystate_content" translatable="true" description="Instructions shown when starting a chat with image input, explaining how to add images (up to 10). [CHAR_LIMIT=120]">To get started, tap the + below to add an image (max 10 images per chat) and type a prompt to ask a question about it!</string>
   <string name="askimage_emptystate_content_aicore" translatable="true" description="Instructions shown when starting a chat with image input for AICore models, explaining how to add a single image. [CHAR_LIMIT=118]">To get started, tap the + below to add an image (max 1 image per chat) and type a prompt to ask a question about it!</string>
   <string name="askaudio_emptystate_title" translatable="false">Audio Scribe</string>
   <string name="askaudio_emptystate_content" translatable="true" description="Instructions shown when starting a chat with audio input, explaining how to add a clip. [CHAR_LIMIT=139]">To get started, tap the + below to add a audio clip (limited to 1 clip up to 30 seconds) and type a prompt to transcribe or translate it!</string>
-  <string name="gallery_news_notification_title" translatable="true" description="Default title for push notifications about gallery news. [CHAR_LIMIT=14]">Gallery News</string>
+  <string name="gallery_news_notification_title" translatable="true" description="Default title for push notifications about app news. [CHAR_LIMIT=14]">Jarvis News</string>
   <string name="baseline" translatable="true" description="Label for a button or chip to set a benchmark run as the comparison baseline. [CHAR_LIMIT=10]">Baseline</string>
   <string name="basic_info" translatable="true" description="Header for a section showing basic information about a benchmark run. [CHAR_LIMIT=12]">Basic info</string>
   <string name="benchmark" translatable="true" description="Label or title referring to the benchmark functionality. [CHAR_LIMIT=11]">Benchmark</string>
@@ -181,7 +181,15 @@
   <string name="settings_dialog_view_app_terms_of_service" translatable="true" description="Button label to open and read the application's terms of service. [CHAR_LIMIT=27]">View App Terms of Service</string>
   <string name="settings_dialog_gemma_prohibited_use_policy" translatable="true" description="Link text pointing to the Gemma model's prohibited use policy document. [CHAR_LIMIT=29]">Gemma Prohibited Use Policy</string>
   <string name="settings_dialog_firebase_analytics_title" translatable="true" description="Title for the settings toggle control to opt-in/out of analytics tracking. [CHAR_LIMIT=20]">Firebase Analytics</string>
-  <string name="settings_dialog_firebase_analytics_description" translatable="true" description="Description for the Firebase Analytics toggle explaining that it helps improve the app. [CHAR_LIMIT=49]">Send usage data to help improve AI Edge Gallery</string>
+  <string name="settings_dialog_firebase_analytics_description" translatable="true" description="Description for the Firebase Analytics toggle explaining that it helps improve the app. [CHAR_LIMIT=49]">Send usage data to help improve Android Jarvis</string>
+  <string name="settings_saved_prompts_title" translatable="true">Saved prompts</string>
+  <string name="settings_saved_prompts_description" translatable="true">Used for new chat and agent sessions. System Instructions are applied first, followed by the Personality Prompt.</string>
+  <string name="system_instructions_label" translatable="true">System Instructions</string>
+  <string name="system_instructions_description" translatable="true">Rules, priorities, and persistent behavior for the assistant.</string>
+  <string name="personality_prompt_label" translatable="true">Personality Prompt</string>
+  <string name="personality_prompt_description" translatable="true">Tone, voice, conversational style, and personality.</string>
+  <string name="save_prompts" translatable="true">Save prompts</string>
+  <string name="prompts_saved_locally" translatable="true">Saved locally</string>
   <string name="share" translatable="true" description="Button label to share content (images, text) via other apps. [CHAR_LIMIT=7]">Share</string>
   <string name="slide_up_to_cancel" translatable="true" description="Instruction text telling the user they can slide their finger up to cancel voice recording. [CHAR_LIMIT=20]">Slide up to cancel</string>
   <string name="system_prompt_placeholder" translatable="true" description="Placeholder hint text inside the system prompt editor text field showing example instructions. [CHAR_LIMIT=134]">Enter system instructions (e.g., \"You are a versatile assistant. Provide accurate, context-aware responses in a professional tone.\")</string>
@@ -193,7 +201,7 @@
   <string name="test" translatable="true" description="Button label or header for testing functionality. [CHAR_LIMIT=6]">Test</string>
   <string name="text_image_generation_text_field_placeholder" translatable="true" description="Placeholder hint in a text field for generating images from text prompts. [CHAR_LIMIT=14]">Type prompt…</string>
   <string name="text_input_placeholder_llm_chat" translatable="true" description="Placeholder hint in the chat message input field (e.g., 'Type prompt...'). [CHAR_LIMIT=14]">Type prompt…</string>
-  <string name="tos_dialog_title_app" translatable="true" description="Title of the onboarding Terms of Service dialog. [CHAR_LIMIT=35]">Welcome to Google AI Edge Gallery</string>
+  <string name="tos_dialog_title_app" translatable="true" description="Title of the onboarding Terms of Service dialog. [CHAR_LIMIT=35]">Welcome to Android Jarvis</string>
   <!-- Body text of the Terms of Service dialog. Contains links to Google Terms of Service and Privacy Policy. -->
   <string name="tos_dialog_body" translatable="true" description="Main legal and privacy text inside the Terms of Service dialog, including links to Google policies. [CHAR_LIMIT=647]">By using this app, you agree to the [Google Terms of Service](https://policies.google.com/terms?hl=en-US).\n\nTo learn what information we collect and why, how we use it, and how to review and update it, please review the [Google Privacy Policy](https://policies.google.com/privacy?hl=en-US).\n\nThis app collects aggregated usage metrics to understand user engagement, such as error messages, app actions, IP inferred approximate location, OS version. This data is processed in accordance with the [Google Privacy Policy](https://policies.google.com/privacy?hl=en-US).\n\nYour use of each model is subject to the applicable model license terms.</string>
   <!-- Title of the Gemma Terms of Use dialog. -->
@@ -357,7 +365,7 @@
   <string name="mcp_tool_revoke_permission_content" translatable="true" description="Message asking the user if they are sure they want to revoke the automatic execution permission for the tool. [CHAR_LIMIT=77]">Are you sure you want to revoke permission to automatically call this tool?</string>
   <string name="manage_mcp_servers" translatable="true" description="Title of the screen/bottom sheet where users can manage Model Context Protocol (MCP) servers. [CHAR_LIMIT=20]">Manage MCP servers</string>
   <string name="add_mcp_server" translatable="true" description="Button label to add a new MCP server. [CHAR_LIMIT=16]">Add MCP server</string>
-  <string name="learn_more_about_mcp" translatable="true" description="Link text directing users to documentation about Model Context Protocol (MCP). [CHAR_LIMIT=48]">Learn more about MCP in Google AI Edge Gallery</string>
+  <string name="learn_more_about_mcp" translatable="true" description="Link text directing users to documentation about Model Context Protocol (MCP). [CHAR_LIMIT=48]">Learn more about MCP in Android Jarvis</string>
   <string name="learn_more_about_mcp_short" translatable="true" description="Link text to learn more about MCP (Model Context Protocol). [CHAR_LIMIT=12]">Learn more</string>
   <string name="search_mcp_server" translatable="true" description="Placeholder text in a search field to search for an MCP (Model Context Protocol) server. [CHAR_LIMIT=26]">Search for an MCP server</string>
   <plurals name="mcp_servers_count" translatable="true">

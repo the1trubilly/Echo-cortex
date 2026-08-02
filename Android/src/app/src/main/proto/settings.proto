@@ -80,6 +80,10 @@ message Settings {
 
   repeated string viewed_promo_id = 10;
   bool disable_firebase_analytics = 11;
+  // Global instructions appended to each chat task's built-in instructions.
+  string system_instructions = 12;
+  // Global tone, voice, and personality guidance kept separate from system instructions.
+  string personality_prompt = 13;
 }
 
 message McpAuth {
