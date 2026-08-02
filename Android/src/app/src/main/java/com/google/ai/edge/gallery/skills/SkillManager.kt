@@ -34,6 +34,7 @@ import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStreamReader
+import java.net.URI
 import java.net.URL
 import java.security.MessageDigest
 import javax.inject.Inject
@@ -51,6 +52,32 @@ import kotlinx.coroutines.withContext
 private const val TAG = "AGSkillManager"
 
 private const val SKILL_ALLOWLIST_URL = ""
+
+/** Converts a GitHub skill page into the raw-content base URL expected by the installer. */
+internal fun normalizeRemoteSkillBaseUrl(url: String): String {
+  var normalizedUrl = url.trim().substringBefore('#').substringBefore('?')
+  val uri = URI(normalizedUrl)
+  if (uri.scheme == "https" && uri.host.equals("github.com", ignoreCase = true)) {
+    val segments = uri.path.trim('/').split('/').filter { it.isNotBlank() }
+    if (segments.size >= 5 && (segments[2] == "tree" || segments[2] == "blob")) {
+      val skillPath = segments.drop(4).toMutableList()
+      if (skillPath.lastOrNull() == "SKILL.md") {
+        skillPath.removeAt(skillPath.lastIndex)
+      }
+      if (skillPath.isNotEmpty()) {
+        normalizedUrl =
+          "https://raw.githubusercontent.com/${segments[0]}/${segments[1]}/${segments[3]}/" +
+            skillPath.joinToString("/")
+      }
+    }
+  }
+
+  normalizedUrl = normalizedUrl.trimEnd('/')
+  if (normalizedUrl.endsWith("/SKILL.md")) {
+    normalizedUrl = normalizedUrl.dropLast("/SKILL.md".length)
+  }
+  return normalizedUrl
+}
 
 enum class SkillSource(val sourceName: String) {
   BUILTIN("builtin"),
@@ -178,14 +205,8 @@ constructor(
     return withContext(Dispatchers.IO) {
       Log.d(TAG, "Validating skill from URL: $url")
 
-      // 1. Normalize the URL: remove trailing "/SKILL.md" or "/".
-      var normalizedUrl = url
-      if (normalizedUrl.endsWith("/SKILL.md")) {
-        normalizedUrl = normalizedUrl.dropLast("/SKILL.md".length)
-      }
-      if (normalizedUrl.endsWith("/")) {
-        normalizedUrl = normalizedUrl.dropLast(1)
-      }
+      // 1. Normalize direct URLs and ordinary GitHub tree/blob pages to a raw content base URL.
+      val normalizedUrl = normalizeRemoteSkillBaseUrl(url)
       val skillMdUrl = "$normalizedUrl/SKILL.md"
       Log.d(TAG, "Fetching SKILL.md from: $skillMdUrl")
 

@@ -16,7 +16,13 @@
 
 package com.google.ai.edge.gallery.customtasks.agentchat
 
+import android.content.Context
+import android.net.Uri
 import android.os.Bundle
+import android.webkit.JavascriptInterface
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -114,6 +120,7 @@ import com.google.ai.edge.gallery.firebaseAnalytics
 import com.google.ai.edge.gallery.proto.Skill
 import com.google.ai.edge.gallery.tools.getSkillSecretKey
 import com.google.ai.edge.gallery.ui.common.FloatingBanner
+import com.google.ai.edge.gallery.ui.common.BaseGalleryWebViewClient
 import com.google.ai.edge.gallery.ui.common.GalleryWebView
 import com.google.ai.edge.gallery.ui.theme.customColors
 import kotlinx.coroutines.CoroutineScope
@@ -782,15 +789,59 @@ fun SkillManagerBottomSheet(
   }
 
   if (showCommunitySkillsBottomSheet) {
-    ViewCommunitySkillsBottomSheet(onDismiss = { showCommunitySkillsBottomSheet = false })
+    ViewCommunitySkillsBottomSheet(
+      skillManagerViewModel = skillManagerViewModel,
+      onDismiss = { showCommunitySkillsBottomSheet = false },
+      onSkillAdded = { scrollToBottomOfList(scope, listState) },
+    )
   }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ViewCommunitySkillsBottomSheet(onDismiss: () -> Unit) {
+fun ViewCommunitySkillsBottomSheet(
+  skillManagerViewModel: SkillManagerViewModel,
+  onDismiss: () -> Unit,
+  onSkillAdded: () -> Unit,
+) {
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   val scope = rememberCoroutineScope()
+  val context = androidx.compose.ui.platform.LocalContext.current
+  var webView by remember { mutableStateOf<WebView?>(null) }
+  var installingSkillName by remember { mutableStateOf<String?>(null) }
+  var installedSkillName by remember { mutableStateOf<String?>(null) }
+  var installError by remember { mutableStateOf<String?>(null) }
+  val webViewClient =
+    remember(context) {
+      CommunitySkillsWebViewClient(
+        context = context,
+        onInstallRequested = { skillUrl ->
+          val skillName = getOfficialFeaturedSkillName(skillUrl)
+          if (skillName == null) {
+            installError = context.getString(R.string.skill_install_invalid_source)
+          } else if (installingSkillName == null) {
+            installingSkillName = skillName
+            installedSkillName = null
+            installError = null
+            skillManagerViewModel.validateAndAddSkillFromUrl(
+              url = skillUrl,
+              onSuccess = {
+                installingSkillName = null
+                installedSkillName = skillName
+                webView?.evaluateJavascript(markSkillInstalledScript(skillName), null)
+                onSkillAdded()
+              },
+              onValidationError = { error ->
+                installingSkillName = null
+                installError = error
+              },
+            )
+          }
+        },
+      )
+    }
+
+  BackHandler(enabled = webView?.canGoBack() == true) { webView?.goBack() }
 
   ModalBottomSheet(
     onDismissRequest = onDismiss,
@@ -809,7 +860,7 @@ fun ViewCommunitySkillsBottomSheet(onDismiss: () -> Unit) {
             style = MaterialTheme.typography.titleLarge,
           )
           Text(
-            stringResource(R.string.add_skill_option_view_community_skills_description),
+            stringResource(R.string.community_skills_browser_description),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
@@ -827,14 +878,172 @@ fun ViewCommunitySkillsBottomSheet(onDismiss: () -> Unit) {
         }
       }
 
+      installingSkillName?.let { skillName ->
+        Row(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+          CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+          Text(
+            text = stringResource(R.string.skill_installing, skillName),
+            style = MaterialTheme.typography.bodyMedium,
+          )
+        }
+      }
+      installedSkillName?.let { skillName ->
+        Text(
+          text = stringResource(R.string.skill_installed, skillName),
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.primary,
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+      }
+      installError?.let { error ->
+        Text(
+          text = error,
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.error,
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+      }
+
       GalleryWebView(
         modifier = Modifier.fillMaxWidth().weight(1f),
-        initialUrl = AgentSkillsURLs.DISCUSSIONS,
+        initialUrl = AgentSkillsURLs.FEATURED,
         preventParentScrolling = true,
+        customWebViewClient = webViewClient,
+        onWebViewCreated = { createdWebView ->
+          webView = createdWebView
+          createdWebView.addJavascriptInterface(
+            CommunitySkillInstallerBridge { skillUrl ->
+              createdWebView.post { webViewClient.requestInstall(skillUrl) }
+            },
+            "AndroidJarvisSkills",
+          )
+        },
       )
     }
   }
 }
+
+private const val INSTALL_SKILL_SCHEME = "jarvis-install"
+private const val OFFICIAL_FEATURED_SKILL_PATH = "/google-ai-edge/gallery/tree/main/skills/featured/"
+
+private fun getOfficialFeaturedSkillName(url: String): String? {
+  val uri = Uri.parse(url)
+  if (uri.scheme != "https" || uri.host != "github.com") return null
+  val segments = uri.pathSegments
+  if (
+    segments.size != 7 ||
+      segments[0] != "google-ai-edge" ||
+      segments[1] != "gallery" ||
+      segments[2] != "tree" ||
+      segments[3] != "main" ||
+      segments[4] != "skills" ||
+      segments[5] != "featured"
+  ) {
+    return null
+  }
+  return segments[6].takeIf { it.isNotBlank() }
+}
+
+private fun markSkillInstalledScript(skillName: String): String {
+  val safeName = skillName.replace("\\", "\\\\").replace("'", "\\'")
+  return """
+    (function() {
+      var button = document.querySelector("button[data-jarvis-skill='$safeName']");
+      if (button) {
+        button.textContent = '✓';
+        button.disabled = true;
+        button.setAttribute('aria-label', '$safeName installed');
+      }
+    })();
+  """
+    .trimIndent()
+}
+
+private class CommunitySkillsWebViewClient(
+  context: Context,
+  private val onInstallRequested: (String) -> Unit,
+) : BaseGalleryWebViewClient(context = context) {
+  fun requestInstall(url: String) {
+    onInstallRequested(url)
+  }
+
+  override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+    val uri = request?.url ?: return false
+    if (uri.scheme == INSTALL_SKILL_SCHEME) {
+      uri.getQueryParameter("url")?.let(onInstallRequested)
+      return true
+    }
+    return false
+  }
+
+  override fun onPageFinished(view: WebView?, url: String?) {
+    super.onPageFinished(view, url)
+    if (url?.startsWith(AgentSkillsURLs.FEATURED) == true) {
+      view?.evaluateJavascript(INJECT_INSTALL_BUTTONS_SCRIPT, null)
+    }
+  }
+}
+
+private class CommunitySkillInstallerBridge(private val onInstallRequested: (String) -> Unit) {
+  @JavascriptInterface
+  fun install(url: String) {
+    onInstallRequested(url)
+  }
+}
+
+private val INJECT_INSTALL_BUTTONS_SCRIPT =
+  """
+    (function() {
+      var pathPrefix = '$OFFICIAL_FEATURED_SKILL_PATH';
+      function decorateSkillLinks() {
+        var links = document.querySelectorAll("a[href^='" + pathPrefix + "']");
+        links.forEach(function(link) {
+          var href = (link.getAttribute('href') || '').split('?')[0].replace(/\/$/, '');
+          var skillName = href.substring(pathPrefix.length);
+          if (!skillName || skillName.indexOf('/') !== -1) return;
+
+          var row = link.closest('[role="row"]') || link.closest('li') || link.parentElement;
+          if (!row || row.querySelector("button[data-jarvis-skill='" + skillName + "']")) return;
+
+          var button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = '+';
+          button.setAttribute('data-jarvis-skill', skillName);
+          button.setAttribute('aria-label', 'Install ' + skillName);
+          button.style.cssText =
+            'margin-left:12px;min-width:34px;height:30px;border:1px solid #39ff14;' +
+            'border-radius:15px;background:#071007;color:#39ff14;font-size:22px;' +
+            'font-weight:700;line-height:24px;cursor:pointer;z-index:1000;';
+          button.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            event.stopPropagation();
+            var skillUrl = 'https://github.com' + href;
+            if (window.AndroidJarvisSkills && window.AndroidJarvisSkills.install) {
+              window.AndroidJarvisSkills.install(skillUrl);
+            } else {
+              window.location.href =
+                '$INSTALL_SKILL_SCHEME://skill?url=' + encodeURIComponent(skillUrl);
+            }
+          });
+
+          var target = row.querySelector('[role="gridcell"]:last-child') || row;
+          target.appendChild(button);
+        });
+      }
+
+      decorateSkillLinks();
+      if (!window.__jarvisSkillObserver) {
+        window.__jarvisSkillObserver = new MutationObserver(decorateSkillLinks);
+        window.__jarvisSkillObserver.observe(document.body, { childList: true, subtree: true });
+      }
+    })();
+  """
+    .trimIndent()
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

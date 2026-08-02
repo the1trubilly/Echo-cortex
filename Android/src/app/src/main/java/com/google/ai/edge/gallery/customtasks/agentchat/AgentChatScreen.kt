@@ -108,6 +108,7 @@ import com.google.ai.edge.gallery.ui.common.chat.LogMessageLevel
 import com.google.ai.edge.gallery.ui.common.chat.SendMessageTrigger
 import com.google.ai.edge.gallery.ui.llmchat.LlmChatScreen
 import com.google.ai.edge.gallery.ui.llmchat.LlmChatViewModel
+import com.google.ai.edge.gallery.ui.home.SettingsDialog
 import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.litertlm.Message
@@ -147,6 +148,10 @@ fun AgentChatScreen(
   val screenWidthDp = remember { with(density) { windowInfo.containerSize.width.toDp() } }
   var showSkillManagerBottomSheet by remember { mutableStateOf(false) }
   var showMcpManagerBottomSheet by remember { mutableStateOf(false) }
+  var showControlCenterBottomSheet by remember { mutableStateOf(false) }
+  var showSettingsDialog by remember { mutableStateOf(false) }
+  var returnToControlCenterAfterSkills by remember { mutableStateOf(false) }
+  var returnToControlCenterAfterMcp by remember { mutableStateOf(false) }
   var showAskInfoDialog by remember { mutableStateOf(false) }
   var currentAskInfoAction by remember { mutableStateOf<AskInfoToolAction?>(null) }
   var currentMcpPermissionAction by remember {
@@ -233,7 +238,7 @@ fun AgentChatScreen(
   LlmChatScreen(
     modelManagerViewModel = modelManagerViewModel,
     taskId = BuiltInTaskId.LLM_AGENT_CHAT,
-    navigateUp = navigateUp,
+    navigateUp = { showControlCenterBottomSheet = true },
     viewModel = viewModel,
     skillCount = skillCount,
     mcpCount = mcpCount,
@@ -301,8 +306,14 @@ fun AgentChatScreen(
         clearHistory = clearHistory,
       )
     },
-    onSkillClicked = { showSkillManagerBottomSheet = true },
-    onMcpClicked = { showMcpManagerBottomSheet = true },
+    onSkillClicked = {
+      returnToControlCenterAfterSkills = false
+      showSkillManagerBottomSheet = true
+    },
+    onMcpClicked = {
+      returnToControlCenterAfterMcp = false
+      showMcpManagerBottomSheet = true
+    },
     showImagePicker = true,
     showAudioPicker = true,
     getActiveSkills = {
@@ -310,6 +321,7 @@ fun AgentChatScreen(
         skillManagerViewModel.getSkillShortId(skill)
       }
     },
+    cleanupModelsOnNavigateUp = false,
     composableBelowMessageList = { model ->
       val actionChannel = agentTools.receiveActionChannel
       val doneIcon = ImageVector.vectorResource(R.drawable.skill)
@@ -544,7 +556,7 @@ fun AgentChatScreen(
                   stringResource(
                     R.string.agent_skills_intro,
                     AgentSkillsURLs.REPOSITORY,
-                    AgentSkillsURLs.DISCUSSIONS,
+                    AgentSkillsURLs.FEATURED,
                     stringResource(R.string.agent_skills),
                   )
                 ),
@@ -657,6 +669,41 @@ fun AgentChatScreen(
     )
   }
 
+  if (showControlCenterBottomSheet) {
+    JarvisControlCenterBottomSheet(
+      onDismiss = { showControlCenterBottomSheet = false },
+      onSettingsClick = {
+        showControlCenterBottomSheet = false
+        showSettingsDialog = true
+      },
+      onSkillsClick = {
+        showControlCenterBottomSheet = false
+        returnToControlCenterAfterSkills = true
+        showSkillManagerBottomSheet = true
+      },
+      onMcpClick = {
+        showControlCenterBottomSheet = false
+        returnToControlCenterAfterMcp = true
+        showMcpManagerBottomSheet = true
+      },
+      onModelsClick = {
+        showControlCenterBottomSheet = false
+        navigateUp()
+      },
+    )
+  }
+
+  if (showSettingsDialog) {
+    SettingsDialog(
+      curFirebaseAnalytics = modelManagerViewModel.readFirebaseAnalytics(),
+      modelManagerViewModel = modelManagerViewModel,
+      onDismissed = {
+        showSettingsDialog = false
+        showControlCenterBottomSheet = true
+      },
+    )
+  }
+
   if (showSkillManagerBottomSheet) {
     SkillManagerBottomSheet(
       agentTools = agentTools,
@@ -664,6 +711,10 @@ fun AgentChatScreen(
       onDismiss = { selectedSkillsChanged ->
         // Hide sheet.
         showSkillManagerBottomSheet = false
+        if (returnToControlCenterAfterSkills) {
+          returnToControlCenterAfterSkills = false
+          showControlCenterBottomSheet = true
+        }
 
         // Reset session when selected skills changed.
         if (selectedSkillsChanged) {
@@ -686,6 +737,10 @@ fun AgentChatScreen(
       mcpManagerViewModel = mcpManagerViewModel,
       onDismiss = { selectMcpsAndToolsChanged ->
         showMcpManagerBottomSheet = false
+        if (returnToControlCenterAfterMcp) {
+          returnToControlCenterAfterMcp = false
+          showControlCenterBottomSheet = true
+        }
         if (selectMcpsAndToolsChanged) {
           Log.d(TAG, "Selected MCPs or tools changed. Resetting conversation.")
           resetSessionWithCurrentSkillsAndMcps(

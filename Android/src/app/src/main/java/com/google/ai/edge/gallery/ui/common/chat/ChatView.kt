@@ -144,6 +144,7 @@ fun ChatView(
   curSystemPrompt: String = "",
   onSystemPromptChanged: (String) -> Unit = {},
   sendMessageTrigger: SendMessageTrigger? = null,
+  cleanupModelsOnNavigateUp: Boolean = true,
 ) {
   val uiState by viewModel.uiState.collectAsState()
   val modelManagerUiState by modelManagerViewModel.uiState.collectAsState()
@@ -179,13 +180,19 @@ fun ChatView(
   var navigatingUp by remember { mutableStateOf(false) }
 
   val handleNavigateUp = {
-    navigatingUp = true
+    if (cleanupModelsOnNavigateUp) {
+      navigatingUp = true
+    }
     navigateUp()
 
-    // clean up all models.
-    scope.launch(Dispatchers.Default) {
-      for (model in task.models) {
-        modelManagerViewModel.cleanupModel(context = context, task = task, model = model)
+    if (cleanupModelsOnNavigateUp) {
+      // Clean up all models when actually leaving the chat screen. Jarvis uses the same callback
+      // to open its control center over the current conversation, so that path keeps the active
+      // model and session alive.
+      scope.launch(Dispatchers.Default) {
+        for (model in task.models) {
+          modelManagerViewModel.cleanupModel(context = context, task = task, model = model)
+        }
       }
     }
   }

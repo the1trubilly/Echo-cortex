@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Android Jarvis now opens directly into one multimodal Jarvis agent chat instead of the Edge Gallery task grid. That surface can select local or OpenAI models, accepts supported media, exposes Skills and MCP controls, and answers normal questions without forcing tool use. Tiny Garden and the standalone Mobile Actions demo are no longer registered as user-facing tasks; their source remains temporarily available for safe capability extraction.
+Android Jarvis now opens directly into one multimodal Jarvis agent chat instead of the Edge Gallery task grid. Android Back and the chat toolbar's back arrow open an in-session Jarvis control center with Settings, Skills, MCP servers, and model management instead of entering the retired Gallery home. The Skills manager includes an in-app GitHub catalog whose official skill rows have one-tap install buttons backed by the existing parser and validator.
 
 ## Permanent architecture decisions
 
@@ -31,7 +31,10 @@ Android Jarvis now opens directly into one multimodal Jarvis agent chat instead 
 - Jarvis should answer normally when a capability is unnecessary. Skills and MCP tools are optional capabilities, and the absence of a matching tool must never reduce ordinary chat to a `No skills or tools found` response.
 - Jarvis is the only registered general chat task. Keep the former AI Chat implementation available as dormant source while its shared components are reused, but do not register a competing task or duplicate its OpenAI models.
 - Treat `Model.name` as the stable cross-task model identity. Global model-management aggregation must deduplicate by `name`, not by full mutable `Model` equality.
-- Leaving the primary Jarvis chat must return to Home, where the navigation drawer and Settings remain reachable; it must not strand the user in the global model selector.
+- Back from the primary Jarvis chat must open the Jarvis control center over the active session. It must not exit the app, unload the active model, enter the retired Gallery home, or strand the user in a model selector.
+- Treat the Jarvis control center as the secondary-navigation hub for Settings, Skills, MCP servers, and model management. Closing a nested Settings/Skills/MCP surface returns to this hub.
+- Render the official skill catalog inside the app. A visible `+` beside each official GitHub skill folder invokes the existing validation and persistence path; users must not need to copy a folder URL manually.
+- Limit the GitHub WebView install bridge to exact `https://github.com/google-ai-edge/gallery/tree/main/skills/featured/{skill}` URLs. Convert accepted GitHub tree/blob pages to `raw.githubusercontent.com` internally before fetching `SKILL.md`; do not bypass skill parsing or duplicate-name checks.
 - Keep Tiny Garden unregistered. Keep its code dormant only until any reusable tool patterns have been extracted and the remaining special cases can be deleted safely.
 - Keep Mobile Actions unregistered as a standalone mode. Later expose device actions as provider-neutral, permission-gated tools available to any compatible agent, with explicit confirmation for sensitive or destructive operations.
 - The canonical visual source is `res/drawable-nodpi/jarvis_brand_poster.jpg`, copied without modification from the user-selected Desktop artwork.
@@ -54,6 +57,8 @@ Android Jarvis now opens directly into one multimodal Jarvis agent chat instead 
 - The selected Jarvis artwork must remain recognizable and unclipped under adaptive launcher masks. Do not stretch the poster or use its wordmark at tiny icon sizes.
 - Branding must be visible without removing upstream model/chat functionality or renaming internal source identifiers unnecessarily.
 - Jarvis chat is the primary application surface. Model management, configuration, and other retained Edge Gallery screens are secondary destinations rather than competing chat modes.
+- Android Back from Jarvis must expose Settings and skill installation without crashing or destroying the current chat session.
+- One-tap GitHub installations must be validated, saved locally, enabled on success, and remain present after process death. Keep manual URL and local-directory import as fallback paths.
 - Text, supported images/audio, Skills, MCP tools, and future memory/device capabilities must converge on the same session transcript and model selector.
 - Do not claim successful cloud inference unless a real API response confirms it. Build, install, model-selection, persistence, and error-path evidence are not substitutes for a successful response.
 - Preserve upstream Edge Gallery features and visual patterns; avoid unrelated refactors.
@@ -77,6 +82,10 @@ Android Jarvis now opens directly into one multimodal Jarvis agent chat instead 
 - `OpenAiCredentialsRepository` owns encrypted key storage and a random per-install `safety_identifier` that contains no account or device identity.
 - `OpenAiApiClient` streams Responses API server-sent events into the existing `AgentEvent` contract. It sends text and image inputs, maps authentication/quota/model errors to user-readable messages, and disconnects on cancellation.
 - The Desktop key source selected on 2026-08-02 was structurally recognized but OpenAI returned HTTP 401 with `invalid_api_key`. The app's request path and error UI were verified, but successful OpenAI inference remains blocked until the key is replaced with a valid API-platform key.
+- The reproduced Back crash was a `NullPointerException` at `HomeScreen.kt:901`: the legacy highlighted-task list force-unwrapped the now-unregistered AI Chat task. Jarvis no longer uses Home as its Back destination.
+- Upstream's `SKILL_ALLOWLIST_URL` is blank, so its native featured-skill list contains no remote entries. The working catalog now uses the live official `skills/featured` GitHub directory inside `GalleryWebView`.
+- GitHub's mobile page intercepts custom navigation links, so the per-row install button uses a narrow JavaScript bridge. The bridge can request only exact official featured-folder URLs, which are revalidated natively before installation.
+- Device verification installed `mood-music` from its rendered `+` button, converted the normal GitHub tree URL to the raw `SKILL.md` base, saved it selected, and found it still enabled after a cold app restart.
 - `C:\Users\Billy\Desktop\Echo Downloads` is the user's preferred drop location for future project inputs. Files explicitly named elsewhere on the Desktop remain in scope when the user points to them.
 - `Desktop\bluetooth_content_share.html` contains one project-key-shaped candidate, but a direct redacted authentication check returned HTTP 401 `invalid_api_key`; do not reinstall or claim that credential is valid.
 - Compose `painterResource` can load raster resources directly but cannot load an Android `<bitmap>` wrapper. Compact Compose surfaces must reference `R.drawable.jarvis_brand_icon` directly; the XML wrappers remain suitable for platform launcher/splash consumers.

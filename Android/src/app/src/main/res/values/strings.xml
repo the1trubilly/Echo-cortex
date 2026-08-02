@@ -284,8 +284,8 @@
   <string name="add_script" translatable="true" description="Title of the dialog for adding a new script to a skill. [CHAR_LIMIT=12]">Add script</string>
   <string name="add_default_script" translatable="true" description="Button label to add a template or default script when no scripts exist yet. [CHAR_LIMIT=20]">Add default script</string>
   <string name="add_skill" translatable="true" description="Title of the bottom sheet containing options to add a new skill. [CHAR_LIMIT=11]">Add skill</string>
-  <string name="add_skill_option_view_community_skills_title" translatable="true" description="Title of the option to explore community-contributed skills. [CHAR_LIMIT=23]">View Community Skills</string>
-  <string name="add_skill_option_view_community_skills_description" translatable="true" description="Description for the option to view community skills, explaining where they are hosted (GitHub discussions). [CHAR_LIMIT=60]">Explore community contributed skills on GitHub discussions</string>
+  <string name="add_skill_option_view_community_skills_title" translatable="true" description="Title of the option to install skills from GitHub. [CHAR_LIMIT=23]">Install GitHub Skills</string>
+  <string name="add_skill_option_view_community_skills_description" translatable="true" description="Description for the option to view community skills on GitHub. [CHAR_LIMIT=60]">Browse and install official skills from GitHub</string>
   <string name="add_skill_option_featured_list_title" translatable="true" description="Title of the option to add a skill from a pre-defined featured list. [CHAR_LIMIT=30]">Add skill from featured list</string>
   <string name="add_skill_option_featured_list_description" translatable="true" description="Description for the option to add a skill from the featured list. [CHAR_LIMIT=65]">Add a skill from a curated list of community contributed skills</string>
   <string name="add_skill_option_url_title" translatable="true" description="Title of the option to load a skill by providing its URL. [CHAR_LIMIT=21]">Load skill from URL</string>
@@ -579,7 +579,7 @@
   <!-- Title of dialog warning that a skill is disabled. %s is the skill name. -->
   <string name="disabled_skill_dialog_title" translatable="true" description="Title of the alert dialog indicating that a specific agent skill (passed as a parameter) is disabled. [CHAR_LIMIT=38]">The \'%s\' skill is currently disabled</string>
   <!-- Introductory text for Agent Skills screen. Contains HTML links. -->
-  <string name="agent_skills_intro" translatable="true" description="Introductory text explaining Jarvis skills, with HTML links to documentation/discussions and a placeholder for the agent name. [CHAR_LIMIT=271]">Chat normally, attach supported media, or load a specialized skill. You can also <![CDATA[<a href="%1$s">create your own</a>]]> and explore community contributions on <![CDATA[<a href="%2$s">GitHub discussions</a>]]>.\n\nTry a sample below to see %3$s use a capability.</string>
+  <string name="agent_skills_intro" translatable="true" description="Introductory text explaining Jarvis skills, with HTML links to documentation/catalog and a placeholder for the agent name. [CHAR_LIMIT=271]">Chat normally, attach supported media, or load a specialized skill. You can also <![CDATA[<a href="%1$s">create your own</a>]]> and browse installable skills in the <![CDATA[<a href="%2$s">GitHub catalog</a>]]>.\n\nTry a sample below to see %3$s use a capability.</string>
 
   <!-- Config Labels -->
   <!-- Label for the 'Max tokens' option in the model configuration dialog. -->
@@ -764,6 +764,16 @@
   <string name="skill_chip_query_wikipedia_label" translatable="true" description="Label for the Query Wikipedia skill chip.">Query Wikipedia</string>
   <!-- Label for the Generate QR code skill chip. [CHAR_LIMIT=20] -->
   <string name="skill_chip_generate_qr_code_label" translatable="true" description="Label for the Generate QR code skill chip.">Generate QR code</string>
+  <!-- Jarvis control center -->
+  <string name="jarvis_control_center_title" translatable="true">Android Jarvis</string>
+  <string name="jarvis_control_center_description" translatable="true">Settings, skills, tools, and models</string>
+  <string name="jarvis_settings_description" translatable="true">API key, system instructions, and personality</string>
+  <string name="jarvis_skills_description" translatable="true">Install and choose capabilities for every agent</string>
+  <string name="jarvis_mcp_description" translatable="true">Connect external tools and services</string>
+  <string name="community_skills_browser_description" translatable="true">Tap + beside a skill to validate and install it</string>
+  <string name="skill_installing" translatable="true">Installing %1$s…</string>
+  <string name="skill_installed" translatable="true">%1$s installed and turned on</string>
+  <string name="skill_install_invalid_source" translatable="true">Only skills in the official Android Jarvis catalog can be installed here.</string>
   <!-- Description for the Mobile Actions task. [CHAR_LIMIT=100] -->
   <string name="task_desc_mobile_actions" translatable="true" description="Description for the Mobile Actions task.">Perform various device actions through Function Gemma</string><!-- Description for the Tiny Garden task. [CHAR_LIMIT=300] -->
   <string name="task_desc_tiny_garden" translatable="true" description="Description for the Tiny Garden task.">Use natural language to plant, water, and harvest in this fully offline mini-game.\n\nNote: This is powered by the experimental FunctionGemma model optimized for latency. Due to its compact size (270M), it works well on simple instructions but responses may vary to more complex interactions.</string>

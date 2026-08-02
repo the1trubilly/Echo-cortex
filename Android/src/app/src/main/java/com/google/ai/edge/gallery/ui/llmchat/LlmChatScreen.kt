@@ -85,6 +85,7 @@ fun LlmChatScreen(
   skillCount: Int = 0,
   mcpCount: Int = 0,
   mcpToolsCount: Int = 0,
+  cleanupModelsOnNavigateUp: Boolean = true,
 ) {
   ChatViewWrapper(
     viewModel = viewModel,
@@ -109,6 +110,7 @@ fun LlmChatScreen(
     showImagePicker = showImagePicker,
     showAudioPicker = showAudioPicker,
     getActiveSkills = getActiveSkills,
+    cleanupModelsOnNavigateUp = cleanupModelsOnNavigateUp,
   )
 }
 
@@ -227,6 +229,7 @@ fun ChatViewWrapper(
   skillCount: Int = 0,
   mcpCount: Int = 0,
   mcpToolsCount: Int = 0,
+  cleanupModelsOnNavigateUp: Boolean = true,
 ) {
   val context = LocalContext.current
   val task = modelManagerViewModel.getTaskById(id = taskId)!!
@@ -354,6 +357,7 @@ fun ChatViewWrapper(
     onSystemPromptChanged = onSystemPromptChanged,
     sendMessageTrigger = sendMessageTrigger,
     showAudioPicker = showAudioPicker,
+    cleanupModelsOnNavigateUp = cleanupModelsOnNavigateUp,
   )
 }
 

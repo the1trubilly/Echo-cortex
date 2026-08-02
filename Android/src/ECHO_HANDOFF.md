@@ -1,6 +1,56 @@
 # Android Jarvis — Echo Handoff
 
-## Current milestone: unified Jarvis interface
+## Current milestone: safe Back navigation and one-tap GitHub skills
+
+### Scope completed
+
+- Reproduced the reported Back failure on USB device `R5CX31PBW7V`. Logcat confirmed a `NullPointerException` in `HomeScreen.kt:901`, where the retired home grid force-unwrapped the unregistered AI Chat task.
+- Replaced Jarvis's Back destination with an in-session Android Jarvis control center. Both the system Back gesture and toolbar arrow now expose Settings, Skills, MCP servers, and Model Manager without unloading the current model.
+- Made Settings, Skills, and MCP return to the control center when dismissed.
+- Kept the old Home screen out of the Jarvis Back path; Model Manager remains directly reachable as a secondary destination.
+- Upgraded the embedded GitHub skills page from a read-only browser into an installer. The official `skills/featured` folder renders inside the app and receives a neon `+` button beside each skill row.
+- Added a narrow WebView bridge that accepts only exact official featured-skill folder URLs. Each request still passes through the existing `SkillManager` parser, duplicate check, persistence, and enabled-selection logic.
+- Added conversion from ordinary GitHub tree/blob URLs to the raw-content base URL needed to retrieve `SKILL.md`, plus unit coverage for tree, blob, query-string, and direct URL forms.
+- Updated Jarvis onboarding/add-skill copy to describe the in-app GitHub catalog rather than requiring GitHub Discussions URL copying.
+
+### Exact files changed
+
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/JarvisControlCenterBottomSheet.kt` — new Jarvis secondary-navigation hub for Settings, Skills, MCP, and models.
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/AgentChatScreen.kt` — routes Back into the control center, coordinates nested managers, and preserves the active chat session.
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/SkillManagerBottomSheet.kt` — turns the in-app official GitHub page into a one-tap, status-reporting skill catalog.
+- `app/src/main/java/com/google/ai/edge/gallery/data/Consts.kt` — adds the official featured-skills catalog URL.
+- `app/src/main/java/com/google/ai/edge/gallery/skills/SkillManager.kt` — normalizes GitHub tree/blob pages to raw-content skill bases before the existing validation flow.
+- `app/src/main/java/com/google/ai/edge/gallery/ui/common/chat/ChatView.kt` — distinguishes opening Jarvis controls from actually leaving a chat, preventing unnecessary model cleanup.
+- `app/src/main/java/com/google/ai/edge/gallery/ui/llmchat/LlmChatScreen.kt` — passes the model-cleanup navigation policy through shared chat layers.
+- `app/src/main/java/com/google/ai/edge/gallery/ui/navigation/GalleryNavGraph.kt` — removes legacy Home from the Jarvis navigation callback and points explicit model navigation to Model Manager.
+- `app/src/main/res/values/strings.xml` — adds control-center/install status copy and updates GitHub catalog wording.
+- `app/src/test/java/com/google/ai/edge/gallery/skills/SkillManagerUrlTest.kt` — verifies remote skill URL normalization.
+- `ECHO_BRIEF.md` — records the durable navigation and skill-install architecture.
+- `ECHO_HANDOFF.md` — records this milestone and its command/device evidence.
+
+### Commands and evidence
+
+- Initial reproduction: cold launch followed by system Back produced a fatal `NullPointerException` at `HomeScreen.kt:901` and returned to the launcher.
+- `gradlew.bat testDebugUnitTest assembleDebug` returned `BUILD SUCCESSFUL` for the final source.
+- The final APK install returned `Success`; cold launch returned `Status: ok` for `com.google.aiedge.gallery/com.google.ai.edge.gallery.MainActivity`.
+- A system Back event visibly opened `Android Jarvis — Settings, skills, tools, and models`; `MainActivity` remained `topResumedActivity`, and the Android crash buffer was empty.
+- Settings visibly opened from the hub and system Back returned to the same hub.
+- The official GitHub `skills/featured` page rendered inside Jarvis with neon `+` buttons beside `mood-music`, `restaurant-roulette`, and `virtual-piano`.
+- Tapping the rendered `mood-music` `+` produced native logs for GitHub-to-raw conversion, fetched `SKILL.md`, added the parsed skill, and reported `Successfully added skill from URL: mood-music`.
+- The browser changed the installed row to `✓` and displayed `mood-music installed and turned on`.
+- After a full app force-stop and cold restart, Manage Skills search found `mood-music` under Custom Skills with its toggle checked.
+
+### Unresolved problems
+
+- The official live catalog currently contains three skills. Broader community discovery will require a catalog/index format that supplies a trustworthy installable folder URL per entry; arbitrary Discussion posts are intentionally not granted bridge access.
+- A GitHub DOM redesign could require updating the small button-injection selector. Native URL allowlisting and validation remain independent of that presentation layer.
+- The OpenAI credential pasted into chat must not be propagated into commands or source. It should be revoked because it was exposed, and a replacement should be saved through the encrypted Settings field or dropped as a local file in `Desktop\Echo Downloads` for safe installation.
+
+### Recommended next step
+
+Add a native searchable skill index sourced from a signed/curated manifest while keeping the in-app GitHub detail view and existing validation path. Then implement the OpenAI Responses tool-call loop so installed Skills and MCP tools work with the GPT-5.6 tiers.
+
+## Previous milestone: unified Jarvis interface
 
 ### Scope completed
 
