@@ -130,10 +130,12 @@ fun ModelPicker(
                 downloadStatus = modelManagerUiState.modelDownloadStatus[model.name],
               )
               Text(
-                if (model.localFileRelativeDirPathOverride.isEmpty()) {
-                  model.sizeInBytes.humanReadableSize()
-                } else {
-                  "{ext_file_dir}/${model.localFileRelativeDirPathOverride}"
+                when {
+                  model.runtimeType == RuntimeType.OPENAI ->
+                    stringResource(R.string.openai_cloud_model_status)
+                  model.localFileRelativeDirPathOverride.isEmpty() ->
+                    model.sizeInBytes.humanReadableSize()
+                  else -> "{ext_file_dir}/${model.localFileRelativeDirPathOverride}"
                 },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = labelSmallNarrow.copy(lineHeight = 10.sp),

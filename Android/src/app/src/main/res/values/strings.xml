@@ -298,7 +298,7 @@
   <string name="add_skill_dialog_title_from_local_import" translatable="true" description="Title of the dialog for importing a skill from the device's local storage. [CHAR_LIMIT=20]">Import local skill</string>
   <string name="add_skill_dialog_subtitle_from_local_import" translatable="true" description="Instructions for developers on how to prepare the skill directory on the device before importing it. [CHAR_LIMIT=71]">Please first \"adb push\" the whole skill directory to /sdcard/Download</string>
   <string name="add_skill_manual_input_sheet_title" translatable="true" description="Title of the bottom sheet when the user is creating a new skill manually. [CHAR_LIMIT=16]">Create a skill</string>
-  <string name="agent_skills" translatable="false">Agent Skills</string>
+  <string name="agent_skills" translatable="false">Jarvis</string>
   <string name="disclaimer_dialog_content" translatable="true" description="Disclaimer warning users about the risks of using third-party skills. [CHAR_LIMIT=345]">Third-party skills are not authored or endorsed by Google. Google is not responsible for their contents, security, or data handling practices.\n\nPlease exercise caution before providing sensitive information, such as personal identification, tokens, or API keys.\n\nAny use of an Agent Skill is subject to the applicable terms for that Skill.</string>
   <string name="disclaimer_dialog_title" translatable="true" description="Title of the disclaimer dialog shown when adding a third-party skill. [CHAR_LIMIT=23]">Add third-party skill</string>
   <string name="disclaimer_dialog_agree" translatable="true" description="Button label to agree to the disclaimer terms and proceed. [CHAR_LIMIT=7]">Agree</string>
@@ -579,7 +579,7 @@
   <!-- Title of dialog warning that a skill is disabled. %s is the skill name. -->
   <string name="disabled_skill_dialog_title" translatable="true" description="Title of the alert dialog indicating that a specific agent skill (passed as a parameter) is disabled. [CHAR_LIMIT=38]">The \'%s\' skill is currently disabled</string>
   <!-- Introductory text for Agent Skills screen. Contains HTML links. -->
-  <string name="agent_skills_intro" translatable="true" description="Introductory text explaining what agent skills are, with HTML links to documentation/discussions and a placeholder for the agent name. [CHAR_LIMIT=271]">Use specialized, high-order reasoning by loading different skills or <![CDATA[<a href="%1$s">creating your own</a>]]>. Explore community contributed skills on <![CDATA[<a href="%2$s">GitHub discussions</a>]]>.\n\nTry tapping a sample prompt below to see %3$s in action!</string>
+  <string name="agent_skills_intro" translatable="true" description="Introductory text explaining Jarvis skills, with HTML links to documentation/discussions and a placeholder for the agent name. [CHAR_LIMIT=271]">Chat normally, attach supported media, or load a specialized skill. You can also <![CDATA[<a href="%1$s">create your own</a>]]> and explore community contributions on <![CDATA[<a href="%2$s">GitHub discussions</a>]]>.\n\nTry a sample below to see %3$s use a capability.</string>
 
   <!-- Config Labels -->
   <!-- Label for the 'Max tokens' option in the model configuration dialog. -->
@@ -723,7 +723,7 @@
   <string name="task_label_ask_image" translatable="false">Ask Image</string>
   <string name="task_label_audio_scribe" translatable="false">Audio Scribe</string>
   <string name="task_label_tiny_garden" translatable="false">Tiny Garden</string>
-  <string name="task_label_agent_skills" translatable="false">Agent Skills</string>
+  <string name="task_label_agent_skills" translatable="false">Jarvis</string>
   <!-- Description for the AI Chat task. [CHAR_LIMIT=100] -->
   <string name="task_desc_ai_chat" translatable="true" description="Description for the AI Chat task.">Chat with on-device large language models</string>
   <!-- Short description for the AI Chat task. [CHAR_LIMIT=35] -->
@@ -738,9 +738,9 @@
   <!-- Short description for the Prompt Lab task. [CHAR_LIMIT=35] -->
   <string name="task_short_desc_prompt_lab" translatable="true" description="Short description for the Prompt Lab task.">Single turn use cases</string>
   <!-- Description for the Agent Skills task. [CHAR_LIMIT=100] -->
-  <string name="task_desc_agent_skills" translatable="true" description="Description for the Agent Skills task.">Chat with on-device large language models with skills and tools</string>
+  <string name="task_desc_agent_skills" translatable="true" description="Description for the Jarvis agent task.">Chat with local or cloud models using images, skills, and connected tools</string>
   <!-- Short description for the Agent Skills task. [CHAR_LIMIT=35] -->
-  <string name="task_short_desc_agent_skills" translatable="true" description="Short description for the Agent Skills task.">Complete agentic tasks with chat</string>
+  <string name="task_short_desc_agent_skills" translatable="true" description="Short description for the Jarvis agent task.">One multimodal chat for models and capabilities</string>
 
   <!-- Label for the link to example code. [CHAR_LIMIT=20] -->
   <string name="example_code" translatable="true" description="Label for the link to example code.">Example code</string>

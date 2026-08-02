@@ -22,32 +22,25 @@ private const val OPENAI_CLOUD_MODEL_PATH = "__cloud_provider__/openai"
 fun createOpenAiChatModels(): List<Model> =
   listOf(
     openAiModel(
-      id = "chat-latest",
-      displayName = "OpenAI · ChatGPT Instant",
-      info =
-        "The latest Instant model used by ChatGPT. This alias updates over time. " +
-          "Runs through the OpenAI API and requires an API key in Settings.",
-    ),
-    openAiModel(
       id = "gpt-5.6-sol",
-      displayName = "OpenAI · GPT-5.6 Sol",
+      displayName = "OpenAI · GPT-5.6 High",
       info =
-        "OpenAI's flagship model for the most demanding work. Runs through the OpenAI API " +
-          "and requires an API key in Settings.",
+        "The most capable GPT-5.6 option for demanding work. Runs through the OpenAI API and " +
+          "requires an API key in Settings.",
     ),
     openAiModel(
       id = "gpt-5.6-terra",
-      displayName = "OpenAI · GPT-5.6 Terra",
+      displayName = "OpenAI · GPT-5.6 Medium",
       info =
         "Balances intelligence, speed, and cost. Runs through the OpenAI API and requires an " +
           "API key in Settings.",
     ),
     openAiModel(
       id = "gpt-5.6-luna",
-      displayName = "OpenAI · GPT-5.6 Luna",
+      displayName = "OpenAI · GPT-5.6 Instant",
       info =
-        "The economical GPT-5.6 option for everyday conversations. Runs through the OpenAI API " +
-          "and requires an API key in Settings.",
+        "The fastest GPT-5.6 option for everyday conversations. Runs through the OpenAI API and " +
+          "requires an API key in Settings.",
     ),
   )
 

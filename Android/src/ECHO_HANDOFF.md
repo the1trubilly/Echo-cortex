@@ -1,6 +1,51 @@
 # Android Jarvis — Echo Handoff
 
-## Scope completed
+## Current milestone: unified Jarvis interface
+
+### Scope completed
+
+- Made Jarvis the application start destination instead of the Edge Gallery task grid.
+- Reused the existing Agent Skills chat as the single multimodal Jarvis surface, including model selection, image/audio attachment controls, Skills, MCP, history, and inline tool-result UI.
+- Changed the default agent instructions so normal questions receive normal answers and Skills/MCP tools are optional capabilities.
+- Added the existing OpenAI runtime choices to Jarvis and routed local versus cloud execution through the shared `AgentRuntimeExecutor` contract.
+- Replaced provider codenames with the requested user-facing model tiers: `GPT-5.6 High`, `GPT-5.6 Medium`, and `GPT-5.6 Instant`. Kept the actual API model IDs unchanged and removed the duplicate `chat-latest` Instant card.
+- Replaced the cloud models' leaked placeholder file paths/download icons with a cloud icon and `Cloud · No download required` status.
+- Stopped registering Tiny Garden and standalone Mobile Actions as user-facing tasks. Their source remains dormant for later removal or extraction of permission-gated device capabilities.
+- Replaced remaining primary-screen `Agent Skills` onboarding language with Jarvis language.
+
+### Exact files changed
+
+- `app/src/main/java/com/google/ai/edge/gallery/ui/navigation/GalleryNavGraph.kt` — adds the primary Jarvis route and selects GPT-5.6 Medium as the initial model when no Jarvis model is active.
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/AgentChatTaskModule.kt` — adds OpenAI models, provider routing, and normal-chat-first capability instructions.
+- `app/src/main/java/com/google/ai/edge/gallery/data/OpenAiModels.kt` — exposes the three requested GPT-5.6 tier labels while retaining Sol/Terra/Luna only as internal provider IDs.
+- `app/src/main/java/com/google/ai/edge/gallery/ui/common/ModelPicker.kt` — presents cloud models as cloud services rather than exposing their internal placeholder path.
+- `app/src/main/java/com/google/ai/edge/gallery/ui/common/modelitem/StatusIcon.kt` — uses a cloud status icon for OpenAI entries instead of a downloaded-file icon.
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/tinygarden/TinyGardenTaskModule.kt` — removes Tiny Garden from Hilt's visible task set without deleting its source.
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/mobileactions/MobileActionsModule.kt` — removes Mobile Actions from Hilt's visible task set without deleting action code intended for later capability extraction.
+- `app/src/main/res/values/strings.xml` — renames the agent surface to Jarvis and explains normal chat, supported media, and optional skills.
+- `ECHO_BRIEF.md` — records the unified-interface, model-naming, and future capability decisions.
+- `ECHO_HANDOFF.md` — records this milestone and its verification evidence.
+
+### Commands and evidence
+
+- `gradlew.bat testDebugUnitTest assembleDebug` returned `BUILD SUCCESSFUL`.
+- The debug APK installed on USB device `R5CX31PBW7V` with `Success`.
+- A cold launch of `com.google.aiedge.gallery/com.google.ai.edge.gallery.MainActivity` returned `Status: ok` and left that activity as `topResumedActivity`.
+- The Android crash buffer was empty after startup.
+- A device screenshot confirmed that the app opens directly to the black/neon Jarvis chat, with the Skills and MCP controls visible and `OpenAI · GPT-5.6 Medium` selected.
+
+### Unresolved problems
+
+- The OpenAI runtime does not yet send Skills/MCP definitions through the Responses API or execute its returned function calls. Skills and MCP tools remain functional for compatible local agent models; cloud tool calling is the next provider-runtime milestone.
+- OpenAI accepts text and images in the current implementation but rejects raw audio clips. Provider-independent speech-to-text should be added before full duplex voice.
+- The main Jarvis screen still uses a back-arrow affordance to reach secondary model-management screens. A later shell pass should replace it with a clearer settings/capabilities navigation affordance.
+- The configured OpenAI key still returns `invalid_api_key`, so successful cloud inference remains unverified.
+
+### Recommended next step
+
+Implement the OpenAI Responses tool-call loop against the existing `AgentTools`/`RuntimeToolDispatcher` boundary so Skills and MCP tools work with all three GPT-5.6 tiers. Then add provider-independent speech-to-text to the same composer.
+
+## Previous visual milestone
 
 - Adopted the user-selected J.A.R.V.I.S. poster as Android Jarvis's canonical in-app brand artwork.
 - Produced a faithful square robot-only derivative for small icon surfaces, preserving the neon-green Android body, cyan reactor head, and red center light while removing only the too-small wordmark.

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.DownloadForOffline
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.rounded.Downloading
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material3.Icon
@@ -38,6 +39,7 @@ import com.google.ai.edge.gallery.data.MODEL_INFO_ICON_SIZE
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.ModelDownloadStatus
 import com.google.ai.edge.gallery.data.ModelDownloadStatusType
+import com.google.ai.edge.gallery.data.RuntimeType
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.ui.common.getTaskBgGradientColors
 import com.google.ai.edge.gallery.ui.theme.customColors
@@ -61,7 +63,14 @@ fun StatusIcon(
       } else {
         MaterialTheme.colorScheme.primary
       }
-    if (model.localFileRelativeDirPathOverride.isNotEmpty()) {
+    if (model.runtimeType == RuntimeType.OPENAI) {
+      Icon(
+        Icons.Outlined.Cloud,
+        tint = color,
+        contentDescription = stringResource(R.string.openai_cloud_model_status),
+        modifier = Modifier.size(MODEL_INFO_ICON_SIZE),
+      )
+    } else if (model.localFileRelativeDirPathOverride.isNotEmpty()) {
       Icon(
         Icons.Filled.DownloadForOffline,
         tint = color,

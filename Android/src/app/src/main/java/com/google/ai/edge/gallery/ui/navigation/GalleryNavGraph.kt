@@ -73,6 +73,7 @@ import androidx.navigation.navArgument
 import com.google.ai.edge.gallery.GalleryEvent
 import com.google.ai.edge.gallery.customtasks.common.CustomTaskData
 import com.google.ai.edge.gallery.customtasks.common.CustomTaskDataForBuiltinTask
+import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.ModelDownloadStatusType
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.data.isLegacyTasks
@@ -93,12 +94,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val TAG = "AGGalleryNavGraph"
+private const val ROUTE_JARVIS = "jarvis"
 private const val ROUTE_HOMESCREEN = "homepage"
 private const val ROUTE_MODEL_LIST = "model_list"
 private const val ROUTE_MODEL = "route_model"
 private const val ROUTE_BENCHMARK = "benchmark"
 private const val ROUTE_MODEL_MANAGER = "model_manager"
 private const val ROUTE_NOTIFICATIONS = "notifications"
+private const val DEFAULT_JARVIS_MODEL = "gpt-5.6-terra"
 private const val ENTER_ANIMATION_DURATION_MS = 500
 private val ENTER_ANIMATION_EASING = EaseOutExpo
 private const val ENTER_ANIMATION_DELAY_MS = 100
@@ -185,10 +188,37 @@ fun GalleryNavHost(
 
   NavHost(
     navController = navController,
-    startDestination = ROUTE_HOMESCREEN,
+    startDestination = ROUTE_JARVIS,
     enterTransition = { EnterTransition.None },
     exitTransition = { ExitTransition.None },
   ) {
+    // Jarvis is the primary application surface. The task and model-management screens remain
+    // available as secondary destinations while chat, media, skills, and tools share one session.
+    composable(route = ROUTE_JARVIS) {
+      val jarvisTask =
+        modelManagerViewModel.getCustomTaskByTaskId(id = BuiltInTaskId.LLM_AGENT_CHAT)
+      val defaultModel =
+        jarvisTask?.task?.models?.firstOrNull { model -> model.name == DEFAULT_JARVIS_MODEL }
+          ?: jarvisTask?.task?.models?.firstOrNull()
+
+      if (jarvisTask != null && defaultModel != null) {
+        LaunchedEffect(defaultModel.name) {
+          val selectedModel = modelManagerViewModel.getSelectedModel()
+          if (jarvisTask.task.models.none { model -> model.name == selectedModel?.name }) {
+            modelManagerViewModel.selectModel(defaultModel)
+          }
+        }
+
+        jarvisTask.MainScreen(
+          data =
+            CustomTaskDataForBuiltinTask(
+              modelManagerViewModel = modelManagerViewModel,
+              onNavUp = { navController.navigate(ROUTE_MODEL_MANAGER) },
+            )
+        )
+      }
+    }
+
     // Home screen.
     composable(route = ROUTE_HOMESCREEN) {
       // Create a state to trigger PromoScreen fade in animation.

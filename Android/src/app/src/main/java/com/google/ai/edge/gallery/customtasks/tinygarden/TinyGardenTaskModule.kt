@@ -15,21 +15,15 @@
  */
 package com.google.ai.edge.gallery.customtasks.tinygarden
 
-import android.content.Context
-import com.google.ai.edge.gallery.customtasks.common.CustomTask
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import dagger.multibindings.IntoSet
 
+/**
+ * Tiny Garden is intentionally no longer registered as a user-facing task. Its implementation is
+ * retained temporarily so reusable tool patterns can be extracted without carrying the mini-game
+ * into the unified Jarvis interface.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
-internal object TinyGardenTaskModule {
-  @Provides
-  @IntoSet
-  fun provideTask(@ApplicationContext context: Context): CustomTask {
-    return TinyGardenTask(context)
-  }
-}
+internal object TinyGardenTaskModule {}

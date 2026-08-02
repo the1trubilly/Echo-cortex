@@ -15,21 +15,14 @@
  */
 package com.google.ai.edge.gallery.customtasks.mobileactions
 
-import android.content.Context
-import com.google.ai.edge.gallery.customtasks.common.CustomTask
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import dagger.multibindings.IntoSet
 
+/**
+ * Mobile Actions is intentionally no longer registered as a standalone task. Its action code is
+ * retained for later extraction into permission-gated capabilities available to any Jarvis agent.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
-internal object MobileActionsModule {
-  @Provides
-  @IntoSet
-  fun provideTask(@ApplicationContext context: Context): CustomTask {
-    return MobileActionsTask(context)
-  }
-}
+internal object MobileActionsModule {}
