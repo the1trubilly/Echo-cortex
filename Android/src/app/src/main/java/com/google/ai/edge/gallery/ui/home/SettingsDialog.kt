@@ -106,6 +106,7 @@ fun SettingsDialog(
   var showTos by remember { mutableStateOf(false) }
   var openAiApiKey by remember { mutableStateOf("") }
   var openAiApiKeySaved by remember { mutableStateOf(modelManagerViewModel.hasOpenAiApiKey()) }
+  var openAiApiKeySaveFailed by remember { mutableStateOf(false) }
   val initialSavedPrompts = remember { modelManagerViewModel.readSavedPrompts() }
   var systemInstructions by remember { mutableStateOf(initialSavedPrompts.systemInstructions) }
   var personalityPrompt by remember { mutableStateOf(initialSavedPrompts.personalityPrompt) }
@@ -117,7 +118,30 @@ fun SettingsDialog(
   var savingPrompts by remember { mutableStateOf(false) }
   val coroutineScope = rememberCoroutineScope()
 
-  Dialog(onDismissRequest = onDismissed) {
+  fun savePendingOpenAiApiKey(): Boolean {
+    val pendingKey = openAiApiKey.trim()
+    if (pendingKey.isEmpty()) return true
+
+    return try {
+      modelManagerViewModel.saveOpenAiApiKey(pendingKey)
+      val saved = modelManagerViewModel.hasOpenAiApiKey()
+      openAiApiKeySaveFailed = !saved
+      if (saved) {
+        openAiApiKey = ""
+        openAiApiKeySaved = true
+      }
+      saved
+    } catch (_: Exception) {
+      openAiApiKeySaveFailed = true
+      false
+    }
+  }
+
+  fun dismissSettings() {
+    if (savePendingOpenAiApiKey()) onDismissed()
+  }
+
+  Dialog(onDismissRequest = ::dismissSettings) {
     val focusManager = LocalFocusManager.current
     Card(
       modifier =
@@ -222,14 +246,36 @@ fun SettingsDialog(
             }
             OutlinedTextField(
               value = openAiApiKey,
-              onValueChange = { openAiApiKey = it },
+              onValueChange = {
+                openAiApiKey = it
+                openAiApiKeySaveFailed = false
+              },
               label = { Text(stringResource(R.string.settings_openai_api_key_label)) },
               supportingText = {
-                Text(stringResource(R.string.settings_openai_api_key_description))
+                Text(
+                  stringResource(
+                    if (openAiApiKeySaveFailed) {
+                      R.string.settings_openai_api_key_save_failed
+                    } else {
+                      R.string.settings_openai_api_key_description
+                    }
+                  )
+                )
               },
+              isError = openAiApiKeySaveFailed,
               singleLine = true,
               visualTransformation = PasswordVisualTransformation(),
-              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+              keyboardOptions =
+                KeyboardOptions(
+                  keyboardType = KeyboardType.Password,
+                  imeAction = ImeAction.Done,
+                ),
+              keyboardActions =
+                KeyboardActions(
+                  onDone = {
+                    if (savePendingOpenAiApiKey()) focusManager.clearFocus()
+                  }
+                ),
               modifier = Modifier.fillMaxWidth(),
             )
             Row(
@@ -239,10 +285,7 @@ fun SettingsDialog(
               Button(
                 enabled = openAiApiKey.isNotBlank(),
                 onClick = {
-                  modelManagerViewModel.saveOpenAiApiKey(openAiApiKey)
-                  openAiApiKey = ""
-                  openAiApiKeySaved = true
-                  focusManager.clearFocus()
+                  if (savePendingOpenAiApiKey()) focusManager.clearFocus()
                 },
               ) {
                 Text(
@@ -497,7 +540,7 @@ fun SettingsDialog(
           horizontalArrangement = Arrangement.End,
         ) {
           // Close button
-          Button(onClick = { onDismissed() }) { Text(stringResource(R.string.close)) }
+          Button(onClick = ::dismissSettings) { Text(stringResource(R.string.close)) }
         }
       }
     }

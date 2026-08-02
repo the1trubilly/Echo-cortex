@@ -195,6 +195,7 @@
   <string name="settings_openai_description" translatable="true">Use OpenAI cloud models in AI Chat. API usage is billed separately from a ChatGPT subscription.</string>
   <string name="settings_openai_api_key_label" translatable="false">OpenAI API key</string>
   <string name="settings_openai_api_key_description" translatable="true">Stored encrypted on this device. It is never included in app backups.</string>
+  <string name="settings_openai_api_key_save_failed" translatable="true">Could not save the API key. Please try again.</string>
   <string name="settings_openai_api_key_saved" translatable="true">API key saved</string>
   <string name="settings_openai_save_key" translatable="true">Save key</string>
   <string name="settings_openai_replace_key" translatable="true">Replace key</string>

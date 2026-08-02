@@ -1,6 +1,42 @@
 # Android Jarvis — Echo Handoff
 
-## Current milestone: safe Back navigation and one-tap GitHub skills
+## Current milestone: OpenAI API-key persistence
+
+### Scope completed
+
+- Reproduced the reported persistence state on USB device `R5CX31PBW7V`. The private credential preferences file existed, but it contained neither the encrypted API-key entry nor its IV.
+- Confirmed the failure was an unsaved settings draft: the previous UI saved only when the explicit Save/Replace button was tapped, while Close and system Back discarded typed input.
+- Unified Save/Replace, keyboard Done, Close, and system Back through one save-and-verify path.
+- Added an inline failure state. If encryption or storage fails, Settings remains open and reports the error instead of showing a false saved state.
+- Installed the corrected APK and confirmed the encrypted API-key and IV entries exist.
+- Fully stopped and relaunched the app, reopened Settings, and confirmed it still displays `API key saved`.
+
+### Exact files changed
+
+- `app/src/main/java/com/google/ai/edge/gallery/ui/home/SettingsDialog.kt` — persists a nonblank pending key on every exit path and verifies the repository can read it back before reporting success.
+- `app/src/main/res/values/strings.xml` — adds the credential-save failure message.
+- `ECHO_BRIEF.md` — records the durable credential-draft persistence rule and root-cause discovery.
+- `ECHO_HANDOFF.md` — records this fix and its build/device evidence.
+
+### Commands and evidence
+
+- App-private storage inspection before the fix found a 153-byte `openai_credentials.xml` with zero API-key/IV entries.
+- `gradlew.bat testDebugUnitTest assembleDebug` returned `BUILD SUCCESSFUL` in 25 seconds.
+- Installing `app-debug.apk` on device `R5CX31PBW7V` returned `Success`.
+- App-private storage after the fix contained both required encrypted entries; no plaintext credential was read or printed.
+- After a full force-stop and relaunch, the Settings UI exposed its password field and displayed `API key saved`.
+- The running app's Logcat contained no startup, Android Keystore, AES/GCM, or credential-storage crash.
+
+### Unresolved problems
+
+- Persistence is confirmed; successful OpenAI inference with the currently saved credential has not been tested in this milestone.
+- Any credential pasted into a chat should be considered exposed and rotated even when the app stores its local copy securely.
+
+### Recommended next step
+
+Run one minimal OpenAI text request from Jarvis to distinguish successful authentication from quota, project-access, or model-access errors. Do not treat persistence alone as proof that the provider credential is valid.
+
+## Previous milestone: safe Back navigation and one-tap GitHub skills
 
 ### Scope completed
 
