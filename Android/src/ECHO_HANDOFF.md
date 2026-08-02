@@ -1,6 +1,46 @@
 # Android Jarvis — Echo Handoff
 
-## Current milestone: OpenAI API-key persistence
+## Current milestone: truthful Jarvis runtime self-knowledge
+
+### Scope completed
+
+- Added an authoritative runtime self-model to every Jarvis agent session.
+- Generated the self-model from the actual selected `Model`, runtime type, app build, enabled Skills, and enabled MCP tools rather than relying on branding or provider disclosure behavior.
+- Included the user-facing model tier and exact configured provider model ID, executor path, supported inputs, prompt assembly order, memory status, cloud tool-call limitation, and current self-extension boundary.
+- Made the section refresh on initial model setup and every model/Skill/MCP session reset, replacing any previous generated section to prevent duplication.
+- Defined the future self-extension contract as propose, review, install, test, audit, and rollback with user approval; the model is explicitly forbidden from claiming unconfirmed changes.
+- Verified the result through a real OpenAI response on the connected phone.
+
+### Exact files changed
+
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/JarvisRuntimeSelfModel.kt` — builds the authoritative, provider-neutral runtime self-description and current capability boundaries.
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/AgentChatTaskModule.kt` — appends live self-model metadata during initial agent setup.
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/AgentChatScreen.kt` — regenerates self-model metadata when sessions reset after model or capability changes.
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/McpManagerViewModel.kt` — exposes stable names for enabled MCP tools.
+- `app/src/test/java/com/google/ai/edge/gallery/customtasks/agentchat/JarvisRuntimeSelfModelTest.kt` — verifies exact cloud/local facts, modalities, limitations, ordering, and duplicate replacement.
+- `ECHO_BRIEF.md` — records the durable runtime-truth and controlled self-extension decisions.
+- `ECHO_HANDOFF.md` — records the milestone and live device evidence.
+
+### Commands and evidence
+
+- `gradlew.bat testDebugUnitTest assembleDebug` returned `BUILD SUCCESSFUL` in 28 seconds.
+- Installing the debug APK on USB device `R5CX31PBW7V` returned `Success`.
+- A real query asked: `What exact model and runtime are you using and can you modify yourself`.
+- Jarvis answered with Android Jarvis version `1.0.17 (38)`, `OpenAI · GPT-5.6 Medium`, provider model ID `gpt-5.6-terra`, OpenAI Responses API, `OpenAiAgentRuntimeExecutor` selected through `RoutingAgentRuntimeExecutor`, and text/image support.
+- Jarvis accurately stated that it cannot yet edit the APK/source, install tools, grant permissions, or persistently modify itself, and described the intended user-approved review/install/test/rollback process.
+- This is the first confirmed successful OpenAI response in the project; API authentication and streamed text inference are now verified.
+
+### Unresolved problems
+
+- The OpenAI executor still does not pass Skills/MCP function definitions to the Responses API or return tool outputs to the model. Cloud Jarvis can describe installed capabilities but cannot invoke them yet.
+- Runtime self-knowledge is generated at session boundaries. A future `get_runtime_info` tool should provide live queryable state during long-running sessions.
+- Self-extension currently stops at truthful proposals. No app-level capability exists yet for Jarvis to request a Skill/MCP installation and receive a structured approval/result.
+
+### Recommended next step
+
+Implement the provider-neutral OpenAI Responses tool-call loop, then add a permission-gated `propose_skill_install` capability that can search official/community catalogs, present provenance and requested permissions, wait for user approval, install through `SkillManager`, run validation, and report a structured success/failure result with rollback metadata.
+
+## Previous milestone: OpenAI API-key persistence
 
 ### Scope completed
 

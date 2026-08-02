@@ -278,6 +278,17 @@ constructor(
       }
   }
 
+  /** Returns the stable names of MCP tools currently available to the active agent session. */
+  fun getEnabledMcpToolNames(): List<String> {
+    return _uiState.value.mcpServers
+      .filter { it.mcpServer.enabled }
+      .flatMap { it.mcpServer.toolsList }
+      .filter { it.enabled }
+      .map { it.name }
+      .distinct()
+      .sorted()
+  }
+
   /** Generates a summary of enablement state for all servers and tools. */
   fun getSelectedMcpsAndToolsSummary(): String = buildString {
     for (state in _uiState.value.mcpServers) {

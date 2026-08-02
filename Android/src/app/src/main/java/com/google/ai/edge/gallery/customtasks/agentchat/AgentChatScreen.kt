@@ -840,7 +840,7 @@ private fun resetSessionWithCurrentSkillsAndMcps(
 
   val selectedSkills =
     runBlocking(Dispatchers.Default) { skillManagerViewModel.skillManager.getAvailableSkills() }
-  val finalSystemPrompt =
+  val expandedSystemPrompt =
     PromptExpander()
       .formatSystemInstructions(
         template = actualSystemPrompt,
@@ -850,6 +850,13 @@ private fun resetSessionWithCurrentSkillsAndMcps(
             "___TOOLS___" to toolsPrompt,
           ),
       )
+  val finalSystemPrompt =
+    JarvisRuntimeSelfModel.appendTo(
+      systemInstructions = expandedSystemPrompt,
+      model = model,
+      enabledSkillNames = selectedSkills.map { it.name },
+      enabledMcpToolNames = agentTools.mcpManagerViewModel.getEnabledMcpToolNames(),
+    )
 
   viewModel.resetSession(
     task = task,

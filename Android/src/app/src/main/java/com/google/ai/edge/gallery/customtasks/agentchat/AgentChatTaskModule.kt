@@ -140,20 +140,28 @@ constructor(
 
       // Determine base system prompt based on whether MCP tools are enabled.
       val toolsPrompt = agentTools.mcpManagerViewModel.getToolsPrompt()
+      val selectedSkills = skillsProvider.getAvailableSkills()
       val baseSystemPrompt =
         getEffectiveBaseSystemPrompt(initialSystemPrompt, toolsPrompt.isNotEmpty())
 
       // TODO: inject prompt expander as a dependency.
-      val finalSystemPrompt =
+      val expandedSystemPrompt =
         PromptExpander()
           .formatSystemInstructions(
             template = baseSystemPrompt,
             substitutions =
               mapOf(
-                "___SKILLS___" to formatSelectedSkills(skillsProvider.getAvailableSkills()),
+                "___SKILLS___" to formatSelectedSkills(selectedSkills),
                 "___TOOLS___" to toolsPrompt,
               ),
           )
+      val finalSystemPrompt =
+        JarvisRuntimeSelfModel.appendTo(
+          systemInstructions = expandedSystemPrompt,
+          model = model,
+          enabledSkillNames = selectedSkills.map { it.name },
+          enabledMcpToolNames = agentTools.mcpManagerViewModel.getEnabledMcpToolNames(),
+        )
 
       val config =
         AgentRuntimeConfig(

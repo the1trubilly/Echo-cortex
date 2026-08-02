@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Android Jarvis now opens directly into one multimodal Jarvis agent chat instead of the Edge Gallery task grid. Android Back and the chat toolbar's back arrow open an in-session Jarvis control center with Settings, Skills, MCP servers, and model management instead of entering the retired Gallery home. The Skills manager includes an in-app GitHub catalog whose official skill rows have one-tap install buttons backed by the existing parser and validator.
+Android Jarvis now opens directly into one multimodal Jarvis agent chat instead of the Edge Gallery task grid. Android Back and the chat toolbar's back arrow open an in-session Jarvis control center with Settings, Skills, MCP servers, and model management instead of entering the retired Gallery home. The Skills manager includes an in-app GitHub catalog whose official skill rows have one-tap install buttons backed by the existing parser and validator. Every Jarvis session now receives an authoritative runtime self-model generated from the actual selected model, provider/runtime, modalities, enabled capabilities, memory state, and current self-extension limits.
 
 ## Permanent architecture decisions
 
@@ -25,6 +25,10 @@ Android Jarvis now opens directly into one multimodal Jarvis agent chat instead 
 - Store the OpenAI API key separately from protobuf settings. Encrypt it with an Android Keystore AES/GCM key, keep only ciphertext and IV in private preferences, and exclude those preferences from both cloud backup and device transfer.
 - Treat a nonblank API-key draft as pending credential input: Save/Replace, keyboard Done, Close, and system Back must all use the same verified save path. If encryption or persistence fails, keep Settings open and show an error instead of reporting success.
 - Never print, log, commit, or place an OpenAI API key in a Gradle property, resource, manifest, or source file.
+- Append an app-generated Runtime Self-Model after task instructions, saved System Instructions, and saved Personality Prompt. Runtime facts are authoritative session metadata; personality may shape their presentation but must not erase or invent them.
+- Runtime self-knowledge must identify the user-facing model tier, exact configured provider model ID, inference provider, executor path, accepted modalities, enabled Skill/MCP names, memory status, and current tool/self-extension limits.
+- Treat self-extension as an app-level capability workflow, not unrestricted prompt-driven source mutation. The required lifecycle is propose, explain requested capabilities, user review, install/update, test, audit, and rollback.
+- Jarvis must never claim that it installed a tool, changed code, wrote memory, granted a permission, or modified itself unless an app/tool result confirms the action.
 - Treat direct client-side OpenAI credentials as a personal-device implementation. A future multi-user or distributed release should move provider credentials behind a trusted backend.
 - Present cloud models alongside local models in Jarvis while preserving local-model functionality. Cloud model cards are ready immediately and must not expose download controls or a user-facing context-size control.
 - Keep OpenAI provider IDs internal. Present `gpt-5.6-sol` as `GPT-5.6 High`, `gpt-5.6-terra` as `GPT-5.6 Medium`, and `gpt-5.6-luna` as `GPT-5.6 Instant`. Do not expose Sol/Terra/Luna branding in the model picker.
@@ -54,6 +58,7 @@ Android Jarvis now opens directly into one multimodal Jarvis agent chat instead 
 - Do not add a user-facing context-size setting for cloud models.
 - The OpenAI key must be editable without a model download, masked in the UI, encrypted at rest, excluded from backups, and removable by the user.
 - OpenAI API usage and ChatGPT subscriptions must be described as separate billing products in the UI.
+- When runtime metadata is available, Jarvis must answer model/provider/runtime questions from it instead of saying it lacks visibility into the underlying model.
 - App backgrounds and system bars must remain black. Primary text, interactive controls, focus/selection states, and borders must remain in the neon-green family with readable contrast.
 - The selected Jarvis artwork must remain recognizable and unclipped under adaptive launcher masks. Do not stretch the poster or use its wordmark at tiny icon sizes.
 - Branding must be visible without removing upstream model/chat functionality or renaming internal source identifiers unnecessarily.
@@ -83,6 +88,8 @@ Android Jarvis now opens directly into one multimodal Jarvis agent chat instead 
 - `OpenAiCredentialsRepository` owns encrypted key storage and a random per-install `safety_identifier` that contains no account or device identity.
 - The reproduced key-persistence failure was an unsaved form state, not failed AES/GCM decryption: the private credentials file existed but contained no API-key ciphertext or IV because dismissing Settings bypassed the Save button. Settings now saves a nonblank pending draft before every dismissal path.
 - `OpenAiApiClient` streams Responses API server-sent events into the existing `AgentEvent` contract. It sends text and image inputs, maps authentication/quota/model errors to user-readable messages, and disconnects on cancellation.
+- `JarvisRuntimeSelfModel` is appended during both initial model setup and session resets. It is regenerated when the selected model, enabled Skills, or enabled MCP tools change, and replaces any prior generated section rather than accumulating duplicates.
+- A live OpenAI device query confirmed the self-model: Jarvis reported Android Jarvis 1.0.17 (38), `OpenAI · GPT-5.6 Medium`, exact provider ID `gpt-5.6-terra`, OpenAI Responses API, `OpenAiAgentRuntimeExecutor` through `RoutingAgentRuntimeExecutor`, text/image support, and the truthful current inability to install tools or modify source.
 - The Desktop key source selected on 2026-08-02 was structurally recognized but OpenAI returned HTTP 401 with `invalid_api_key`. The app's request path and error UI were verified, but successful OpenAI inference remains blocked until the key is replaced with a valid API-platform key.
 - The reproduced Back crash was a `NullPointerException` at `HomeScreen.kt:901`: the legacy highlighted-task list force-unwrapped the now-unregistered AI Chat task. Jarvis no longer uses Home as its Back destination.
 - Upstream's `SKILL_ALLOWLIST_URL` is blank, so its native featured-skill list contains no remote entries. The working catalog now uses the live official `skills/featured` GitHub directory inside `GalleryWebView`.
