@@ -357,7 +357,13 @@ class SkillManagerViewModel @Inject constructor(val skillManager: SkillManager) 
 
   companion object {
     val DEFAULT_DISABLED_SKILLS =
-      setOf("calculate-hash", "kitchen-adventure", "text-spinner", "send-email")
+      setOf(
+        "calculate-hash",
+        "jarvis-system-core",
+        "kitchen-adventure",
+        "text-spinner",
+        "send-email",
+      )
 
     fun convertSkillMdToProto(
       mdContent: String,
