@@ -219,7 +219,9 @@ fun ModelStatusDetails(
     // Status label
     else {
       var sizeLabel = model.totalBytes.humanReadableSize()
-      if (model.localFileRelativeDirPathOverride.isNotEmpty()) {
+      if (model.runtimeType == RuntimeType.OPENAI) {
+        sizeLabel = stringResource(R.string.openai_cloud_model_status)
+      } else if (model.localFileRelativeDirPathOverride.isNotEmpty()) {
         sizeLabel = "{ext_files_dir}/${model.localFileRelativeDirPathOverride}"
       }
 

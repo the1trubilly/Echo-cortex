@@ -190,6 +190,15 @@
   <string name="personality_prompt_description" translatable="true">Tone, voice, conversational style, and personality.</string>
   <string name="save_prompts" translatable="true">Save prompts</string>
   <string name="prompts_saved_locally" translatable="true">Saved locally</string>
+  <string name="settings_openai_title" translatable="false">OpenAI</string>
+  <string name="settings_openai_description" translatable="true">Use OpenAI cloud models in AI Chat. API usage is billed separately from a ChatGPT subscription.</string>
+  <string name="settings_openai_api_key_label" translatable="false">OpenAI API key</string>
+  <string name="settings_openai_api_key_description" translatable="true">Stored encrypted on this device. It is never included in app backups.</string>
+  <string name="settings_openai_api_key_saved" translatable="true">API key saved</string>
+  <string name="settings_openai_save_key" translatable="true">Save key</string>
+  <string name="settings_openai_replace_key" translatable="true">Replace key</string>
+  <string name="settings_openai_remove_key" translatable="true">Remove key</string>
+  <string name="openai_cloud_model_status" translatable="true">Cloud · No download required</string>
   <string name="share" translatable="true" description="Button label to share content (images, text) via other apps. [CHAR_LIMIT=7]">Share</string>
   <string name="slide_up_to_cancel" translatable="true" description="Instruction text telling the user they can slide their finger up to cancel voice recording. [CHAR_LIMIT=20]">Slide up to cancel</string>
   <string name="system_prompt_placeholder" translatable="true" description="Placeholder hint text inside the system prompt editor text field showing example instructions. [CHAR_LIMIT=134]">Enter system instructions (e.g., \"You are a versatile assistant. Provide accurate, context-aware responses in a professional tone.\")</string>
@@ -265,6 +274,7 @@
   <!-- Strings for skills -->
   <string name="aichat_emptystate_title" translatable="false">AI Chat</string>
   <string name="aichat_emptystate_content" translatable="true" description="Description text shown on the empty state screen of the AI Chat feature, explaining what it does. [CHAR_LIMIT=44]">Chat with on-device large language models.</string>
+  <string name="aichat_emptystate_content_openai" translatable="true">Chat through the OpenAI API. Messages require internet access and may incur API charges.</string>
   <string name="aichat_emptystate_support_image_audio" translatable="true" description="Description text shown on the empty state screen of the AI Chat feature, explaining the multimodal limits. [CHAR_LIMIT=100]">Support up to 10 images per chat and 1 audio clip up to 30 seconds.</string>
   <string name="aichat_emptystate_support_image_aicore_audio" translatable="true" description="Description text shown on the empty state screen of the AI Chat feature, explaining the multimodal limits. [CHAR_LIMIT=100]">Support 1 image per chat and 1 audio clip up to 30 seconds.</string>
   <string name="aichat_emptystate_support_image" translatable="true" description="Description text shown on the empty state screen of the AI Chat feature, explaining the multimodal limits. [CHAR_LIMIT=100]">Support up to 10 images per chat.</string>

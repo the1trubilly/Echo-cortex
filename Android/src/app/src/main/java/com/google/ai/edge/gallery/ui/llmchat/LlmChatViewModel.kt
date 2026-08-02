@@ -22,6 +22,7 @@ import android.os.Build
 import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.lifecycle.viewModelScope
+import com.google.ai.edge.gallery.agent.AgentConversationMessage
 import com.google.ai.edge.gallery.agent.AgentEvent
 import com.google.ai.edge.gallery.agent.AgentExecutionContext
 import com.google.ai.edge.gallery.agent.AgentRequest
@@ -31,6 +32,7 @@ import com.google.ai.edge.gallery.agent.Attachment
 import com.google.ai.edge.gallery.common.SystemPromptHelper
 import com.google.ai.edge.gallery.data.ConfigKeys
 import com.google.ai.edge.gallery.data.Model
+import com.google.ai.edge.gallery.data.RuntimeType
 import com.google.ai.edge.gallery.data.SystemPromptRepository
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.data.awaitInitialization
@@ -324,6 +326,7 @@ open class LlmChatViewModelBase(
     onDone: () -> Unit = {},
     enableConversationConstrainedDecoding: Boolean = false,
     initialMessages: List<Message> = listOf(),
+    initialAgentMessages: List<AgentConversationMessage> = listOf(),
     clearHistory: Boolean = true,
   ) {
     viewModelScope.launch(Dispatchers.Default) {
@@ -333,23 +336,30 @@ open class LlmChatViewModelBase(
       }
       stopResponse(model = model)
 
-      // TODO: move to runtime executor.
-      while (true) {
-        try {
-          model.runtimeHelper.resetConversation(
-            model = model,
-            supportImage = supportImage,
-            supportAudio = supportAudio,
-            systemInstruction = systemInstruction,
-            tools = tools,
-            enableConversationConstrainedDecoding = enableConversationConstrainedDecoding,
-            initialMessages = initialMessages,
-          )
-          break
-        } catch (e: Exception) {
-          Log.d(TAG, "Failed to reset session. Trying again")
+      if (model.runtimeType == RuntimeType.OPENAI) {
+        runtimeExecutor.resetConversation(
+          systemInstruction = systemInstruction?.toString(),
+          messages = initialAgentMessages,
+        )
+      } else {
+        // TODO: move to runtime executor.
+        while (true) {
+          try {
+            model.runtimeHelper.resetConversation(
+              model = model,
+              supportImage = supportImage,
+              supportAudio = supportAudio,
+              systemInstruction = systemInstruction,
+              tools = tools,
+              enableConversationConstrainedDecoding = enableConversationConstrainedDecoding,
+              initialMessages = initialMessages,
+            )
+            break
+          } catch (e: Exception) {
+            Log.d(TAG, "Failed to reset session. Trying again")
+          }
+          delay(200)
         }
-        delay(200)
       }
       setIsResettingSession(false)
       onDone()
@@ -404,6 +414,9 @@ open class LlmChatViewModelBase(
 
     // Show error message.
     addMessage(model = model, message = ChatMessageError(content = errorMessage))
+
+    // Rebuilding a cloud session cannot repair credentials, billing, rate limits, or access.
+    if (model.runtimeType == RuntimeType.OPENAI) return
 
     // Clean up and re-initialize.
     viewModelScope.launch(Dispatchers.Default) {

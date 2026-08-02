@@ -45,6 +45,7 @@ import com.google.ai.edge.gallery.data.ModelCapability
 import com.google.ai.edge.gallery.data.ModelDownloadStatus
 import com.google.ai.edge.gallery.data.ModelDownloadStatusType
 import com.google.ai.edge.gallery.data.NumberSliderConfig
+import com.google.ai.edge.gallery.data.OpenAiCredentialsRepository
 import com.google.ai.edge.gallery.data.RuntimeType
 import com.google.ai.edge.gallery.data.SavedPrompts
 import com.google.ai.edge.gallery.data.SOC
@@ -207,6 +208,7 @@ constructor(
   private val lifecycleProvider: AppLifecycleProvider,
   private val customTasks: Set<@JvmSuppressWildcards CustomTask>,
   private val systemPromptRepository: SystemPromptRepository,
+  private val openAiCredentialsRepository: OpenAiCredentialsRepository,
   @ApplicationContext private val context: Context,
 ) :
   ViewModel()
@@ -667,6 +669,16 @@ constructor(
       systemInstructions = systemInstructions,
       personalityPrompt = personalityPrompt,
     )
+  }
+
+  fun hasOpenAiApiKey(): Boolean = openAiCredentialsRepository.hasApiKey()
+
+  fun saveOpenAiApiKey(apiKey: String) {
+    openAiCredentialsRepository.saveApiKey(apiKey)
+  }
+
+  fun clearOpenAiApiKey() {
+    openAiCredentialsRepository.clearApiKey()
   }
 
   fun getModelUrlResponse(model: Model, accessToken: String? = null): Int {

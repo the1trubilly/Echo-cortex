@@ -95,6 +95,12 @@ interface AgentRuntimeExecutor {
    */
   suspend fun execute(context: AgentExecutionContext, request: AgentRequest): AgentResponse
 
+  /** Replaces the active conversation context without rebuilding the provider itself. */
+  suspend fun resetConversation(
+    systemInstruction: String?,
+    messages: List<AgentConversationMessage> = emptyList(),
+  ) {}
+
   /**
    * Actively interrupts an ongoing agent execution run, halting active tool executions and model
    * inference.
@@ -115,3 +121,10 @@ interface AgentRuntimeExecutor {
    */
   fun cleanUp(onDone: () -> Unit = {})
 }
+
+enum class AgentConversationRole {
+  USER,
+  ASSISTANT,
+}
+
+data class AgentConversationMessage(val role: AgentConversationRole, val content: String)

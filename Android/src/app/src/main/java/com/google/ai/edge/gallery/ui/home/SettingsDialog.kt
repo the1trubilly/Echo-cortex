@@ -74,6 +74,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.google.ai.edge.gallery.BuildConfig
@@ -114,6 +116,8 @@ fun SettingsDialog(
   val focusRequester = remember { FocusRequester() }
   val interactionSource = remember { MutableInteractionSource() }
   var showTos by remember { mutableStateOf(false) }
+  var openAiApiKey by remember { mutableStateOf("") }
+  var openAiApiKeySaved by remember { mutableStateOf(modelManagerViewModel.hasOpenAiApiKey()) }
   val initialSavedPrompts = remember { modelManagerViewModel.readSavedPrompts() }
   var systemInstructions by remember { mutableStateOf(initialSavedPrompts.systemInstructions) }
   var personalityPrompt by remember { mutableStateOf(initialSavedPrompts.personalityPrompt) }
@@ -232,6 +236,76 @@ fun SettingsDialog(
                 },
               )
             }
+
+          Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            Text(
+              stringResource(R.string.settings_openai_title),
+              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium),
+            )
+            Text(
+              stringResource(R.string.settings_openai_description),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (openAiApiKeySaved) {
+              Text(
+                stringResource(R.string.settings_openai_api_key_saved),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+              )
+            }
+            OutlinedTextField(
+              value = openAiApiKey,
+              onValueChange = { openAiApiKey = it },
+              label = { Text(stringResource(R.string.settings_openai_api_key_label)) },
+              supportingText = {
+                Text(stringResource(R.string.settings_openai_api_key_description))
+              },
+              singleLine = true,
+              visualTransformation = PasswordVisualTransformation(),
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+              modifier = Modifier.fillMaxWidth(),
+            )
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+              Button(
+                enabled = openAiApiKey.isNotBlank(),
+                onClick = {
+                  modelManagerViewModel.saveOpenAiApiKey(openAiApiKey)
+                  openAiApiKey = ""
+                  openAiApiKeySaved = true
+                  focusManager.clearFocus()
+                },
+              ) {
+                Text(
+                  stringResource(
+                    if (openAiApiKeySaved) {
+                      R.string.settings_openai_replace_key
+                    } else {
+                      R.string.settings_openai_save_key
+                    }
+                  )
+                )
+              }
+              if (openAiApiKeySaved) {
+                OutlinedButton(
+                  onClick = {
+                    modelManagerViewModel.clearOpenAiApiKey()
+                    openAiApiKey = ""
+                    openAiApiKeySaved = false
+                    focusManager.clearFocus()
+                  }
+                ) {
+                  Text(stringResource(R.string.settings_openai_remove_key))
+                }
+              }
+            }
+          }
 
           Column(
             modifier = Modifier.fillMaxWidth(),

@@ -49,6 +49,7 @@ import com.google.ai.edge.gallery.data.Category
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.RuntimeType
 import com.google.ai.edge.gallery.data.Task
+import com.google.ai.edge.gallery.data.createOpenAiChatModels
 import com.google.ai.edge.gallery.ui.theme.emptyStateContent
 import com.google.ai.edge.gallery.ui.theme.emptyStateTitle
 import com.google.ai.edge.litertlm.Contents
@@ -78,7 +79,7 @@ constructor(
       label = context.getString(R.string.task_label_ai_chat),
       category = Category.LLM,
       icon = Icons.Outlined.Forum,
-      models = mutableListOf(),
+      models = createOpenAiChatModels().toMutableList(),
       description = context.getString(R.string.task_desc_ai_chat),
       shortDescription = context.getString(R.string.task_short_desc_ai_chat),
       docUrl = "https://github.com/google-ai-edge/LiteRT-LM/blob/main/kotlin/README.md",
@@ -151,7 +152,13 @@ constructor(
           ) {
             Text(stringResource(R.string.aichat_emptystate_title), style = emptyStateTitle)
             Text(
-              stringResource(R.string.aichat_emptystate_content),
+              stringResource(
+                if (model.runtimeType == RuntimeType.OPENAI) {
+                  R.string.aichat_emptystate_content_openai
+                } else {
+                  R.string.aichat_emptystate_content
+                }
+              ),
               style = emptyStateContent,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
               textAlign = TextAlign.Center,

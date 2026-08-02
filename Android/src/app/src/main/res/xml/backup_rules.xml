@@ -20,6 +20,8 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
+    <!-- API credentials are device-bound and must never be included in a backup. -->
+    <exclude domain="sharedpref" path="openai_credentials.xml"/>
     <!--
    <include domain="sharedpref" path="."/>
    <exclude domain="sharedpref" path="device.xml"/>

@@ -37,6 +37,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.google.ai.edge.gallery.GalleryEvent
 import com.google.ai.edge.gallery.R
+import com.google.ai.edge.gallery.agent.AgentConversationMessage
+import com.google.ai.edge.gallery.agent.AgentConversationRole
 import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.ModelCapability
@@ -319,6 +321,7 @@ fun ChatViewWrapper(
     onBenchmarkClicked = { _, _, _, _ -> },
     onResetSessionClicked = { model, chatMessages, clearHistory, onDone ->
       val litertMessages = chatMessages.mapNotNull { convertToLitertMessage(it) }
+      val agentMessages = chatMessages.mapNotNull { convertToAgentMessage(it) }
       if (onResetSessionClickedOverride != null) {
         onResetSessionClickedOverride(task, model, chatMessages, clearHistory, onDone)
       } else {
@@ -329,6 +332,7 @@ fun ChatViewWrapper(
           supportImage = showImagePicker,
           supportAudio = showAudioPicker,
           initialMessages = litertMessages,
+          initialAgentMessages = agentMessages,
           onDone = onDone,
           clearHistory = clearHistory,
         )
@@ -351,6 +355,17 @@ fun ChatViewWrapper(
     sendMessageTrigger = sendMessageTrigger,
     showAudioPicker = showAudioPicker,
   )
+}
+
+private fun convertToAgentMessage(chatMessage: ChatMessage): AgentConversationMessage? {
+  if (chatMessage !is ChatMessageText) return null
+  val role =
+    when (chatMessage.side) {
+      ChatSide.USER -> AgentConversationRole.USER
+      ChatSide.AGENT -> AgentConversationRole.ASSISTANT
+      ChatSide.SYSTEM -> return null
+    }
+  return AgentConversationMessage(role = role, content = chatMessage.content)
 }
 
 private fun convertToLitertMessage(chatMessage: ChatMessage): Message? {

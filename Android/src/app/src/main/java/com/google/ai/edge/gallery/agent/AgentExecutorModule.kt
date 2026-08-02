@@ -31,11 +31,15 @@ internal object AgentExecutorModule {
   @Provides
   @Singleton
   @AiChatExecutor
-  fun provideAiChatExecutor(): AgentRuntimeExecutor {
-    return DefaultAgentRuntimeExecutor(
-      skillsProvider = NoOpSkillsProvider(),
-      toolsProvider = RuntimeToolsProvider(),
-      toolDispatcher = RuntimeToolDispatcher(),
+  fun provideAiChatExecutor(openAiExecutor: OpenAiAgentRuntimeExecutor): AgentRuntimeExecutor {
+    return RoutingAgentRuntimeExecutor(
+      localExecutor =
+        DefaultAgentRuntimeExecutor(
+          skillsProvider = NoOpSkillsProvider(),
+          toolsProvider = RuntimeToolsProvider(),
+          toolDispatcher = RuntimeToolDispatcher(),
+        ),
+      openAiExecutor = openAiExecutor,
     )
   }
 
