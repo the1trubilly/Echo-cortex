@@ -29,6 +29,9 @@ Android Jarvis now opens directly into one multimodal Jarvis agent chat instead 
 - Keep OpenAI provider IDs internal. Present `gpt-5.6-sol` as `GPT-5.6 High`, `gpt-5.6-terra` as `GPT-5.6 Medium`, and `gpt-5.6-luna` as `GPT-5.6 Instant`. Do not expose Sol/Terra/Luna branding in the model picker.
 - Do not show the separate `chat-latest` alias while GPT-5.6 Instant is present; two user-facing Instant choices would be ambiguous.
 - Jarvis should answer normally when a capability is unnecessary. Skills and MCP tools are optional capabilities, and the absence of a matching tool must never reduce ordinary chat to a `No skills or tools found` response.
+- Jarvis is the only registered general chat task. Keep the former AI Chat implementation available as dormant source while its shared components are reused, but do not register a competing task or duplicate its OpenAI models.
+- Treat `Model.name` as the stable cross-task model identity. Global model-management aggregation must deduplicate by `name`, not by full mutable `Model` equality.
+- Leaving the primary Jarvis chat must return to Home, where the navigation drawer and Settings remain reachable; it must not strand the user in the global model selector.
 - Keep Tiny Garden unregistered. Keep its code dormant only until any reusable tool patterns have been extracted and the remaining special cases can be deleted safely.
 - Keep Mobile Actions unregistered as a standalone mode. Later expose device actions as provider-neutral, permission-gated tools available to any compatible agent, with explicit confirmation for sensitive or destructive operations.
 - The canonical visual source is `res/drawable-nodpi/jarvis_brand_poster.jpg`, copied without modification from the user-selected Desktop artwork.
@@ -74,5 +77,7 @@ Android Jarvis now opens directly into one multimodal Jarvis agent chat instead 
 - `OpenAiCredentialsRepository` owns encrypted key storage and a random per-install `safety_identifier` that contains no account or device identity.
 - `OpenAiApiClient` streams Responses API server-sent events into the existing `AgentEvent` contract. It sends text and image inputs, maps authentication/quota/model errors to user-readable messages, and disconnects on cancellation.
 - The Desktop key source selected on 2026-08-02 was structurally recognized but OpenAI returned HTTP 401 with `invalid_api_key`. The app's request path and error UI were verified, but successful OpenAI inference remains blocked until the key is replaced with a valid API-platform key.
+- `C:\Users\Billy\Desktop\Echo Downloads` is the user's preferred drop location for future project inputs. Files explicitly named elsewhere on the Desktop remain in scope when the user points to them.
+- `Desktop\bluetooth_content_share.html` contains one project-key-shaped candidate, but a direct redacted authentication check returned HTTP 401 `invalid_api_key`; do not reinstall or claim that credential is valid.
 - Compose `painterResource` can load raster resources directly but cannot load an Android `<bitmap>` wrapper. Compact Compose surfaces must reference `R.drawable.jarvis_brand_icon` directly; the XML wrappers remain suitable for platform launcher/splash consumers.
 - The Niagara launcher hides non-favorite apps until an alphabet section is selected. Use its `A` section to visually inspect the installed `Android Jarvis` icon.

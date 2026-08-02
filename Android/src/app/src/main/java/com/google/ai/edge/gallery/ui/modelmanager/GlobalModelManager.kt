@@ -198,7 +198,7 @@ fun GlobalModelManager(
   val modelVariants by
     remember(uiState.modelImportingUpdateTrigger) {
       derivedStateOf {
-        val allModels = uiState.tasks.flatMap { it.models }.distinct()
+        val allModels = uiState.tasks.flatMap { it.models }.distinctBy { it.name }
         allModels.filter { it.parentModelName != null }.groupBy { it.parentModelName!! }
       }
     }

@@ -10,6 +10,9 @@
 - Added the existing OpenAI runtime choices to Jarvis and routed local versus cloud execution through the shared `AgentRuntimeExecutor` contract.
 - Replaced provider codenames with the requested user-facing model tiers: `GPT-5.6 High`, `GPT-5.6 Medium`, and `GPT-5.6 Instant`. Kept the actual API model IDs unchanged and removed the duplicate `chat-latest` Instant card.
 - Replaced the cloud models' leaked placeholder file paths/download icons with a cloud icon and `Cloud · No download required` status.
+- Unregistered the old AI Chat task so Jarvis is the sole general chat surface and the three OpenAI models are not contributed twice.
+- Changed global model aggregation to deduplicate by the documented stable model ID (`Model.name`) rather than mutable full-object equality.
+- Changed the Jarvis back path from the global model selector to Home so the navigation drawer and Settings are reachable.
 - Stopped registering Tiny Garden and standalone Mobile Actions as user-facing tasks. Their source remains dormant for later removal or extraction of permission-gated device capabilities.
 - Replaced remaining primary-screen `Agent Skills` onboarding language with Jarvis language.
 
@@ -20,6 +23,9 @@
 - `app/src/main/java/com/google/ai/edge/gallery/data/OpenAiModels.kt` — exposes the three requested GPT-5.6 tier labels while retaining Sol/Terra/Luna only as internal provider IDs.
 - `app/src/main/java/com/google/ai/edge/gallery/ui/common/ModelPicker.kt` — presents cloud models as cloud services rather than exposing their internal placeholder path.
 - `app/src/main/java/com/google/ai/edge/gallery/ui/common/modelitem/StatusIcon.kt` — uses a cloud status icon for OpenAI entries instead of a downloaded-file icon.
+- `app/src/main/java/com/google/ai/edge/gallery/ui/llmchat/LlmChatTaskModule.kt` — keeps the old AI Chat implementation dormant but removes its separate Hilt task registration.
+- `app/src/main/java/com/google/ai/edge/gallery/ui/modelmanager/ModelManagerViewModel.kt` — deduplicates global models by stable model ID.
+- `app/src/main/java/com/google/ai/edge/gallery/ui/modelmanager/GlobalModelManager.kt` — applies the same stable-ID rule to model variants.
 - `app/src/main/java/com/google/ai/edge/gallery/customtasks/tinygarden/TinyGardenTaskModule.kt` — removes Tiny Garden from Hilt's visible task set without deleting its source.
 - `app/src/main/java/com/google/ai/edge/gallery/customtasks/mobileactions/MobileActionsModule.kt` — removes Mobile Actions from Hilt's visible task set without deleting action code intended for later capability extraction.
 - `app/src/main/res/values/strings.xml` — renames the agent surface to Jarvis and explains normal chat, supported media, and optional skills.
@@ -40,6 +46,7 @@
 - OpenAI accepts text and images in the current implementation but rejects raw audio clips. Provider-independent speech-to-text should be added before full duplex voice.
 - The main Jarvis screen still uses a back-arrow affordance to reach secondary model-management screens. A later shell pass should replace it with a clearer settings/capabilities navigation affordance.
 - The configured OpenAI key still returns `invalid_api_key`, so successful cloud inference remains unverified.
+- A direct redacted check of the only candidate in `Desktop\bluetooth_content_share.html` also returned HTTP 401 `invalid_api_key`; it was deliberately not written back into the app. A different key exists in the Codex process environment, but using it requires the user's explicit authorization.
 
 ### Recommended next step
 

@@ -261,13 +261,16 @@ constructor(
   }
 
   fun getAllModels(): List<Model> {
-    val allModels = mutableSetOf<Model>()
+    // A model can be referenced by several capability tasks and task-specific preprocessing may
+    // make those Model data-class instances unequal. The documented stable identity is `name`, so
+    // deduplicate on that field instead of full object equality.
+    val allModelsByName = linkedMapOf<String, Model>()
     for (task in uiState.value.tasks) {
       for (model in task.models) {
-        allModels.add(model)
+        allModelsByName.putIfAbsent(model.name, model)
       }
     }
-    return allModels.toList().sortedBy { it.displayName.ifEmpty { it.name } }
+    return allModelsByName.values.sortedBy { it.displayName.ifEmpty { it.name } }
   }
 
   fun getAllDownloadedModels(): List<Model> {

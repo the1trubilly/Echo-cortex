@@ -201,14 +201,8 @@ constructor(
 @Module
 @InstallIn(SingletonComponent::class) // Or another component that fits your scope
 internal object LlmChatTaskModule {
-  @Provides
-  @IntoSet
-  fun provideTask(
-    @ApplicationContext context: Context,
-    @AiChatExecutor executor: AgentRuntimeExecutor,
-  ): CustomTask {
-    return LlmChatTask(context, executor)
-  }
+  // AI Chat is intentionally no longer registered as a separate task. Jarvis owns the shared
+  // local/OpenAI chat surface so each provider model appears only once to the user.
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

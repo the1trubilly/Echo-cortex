@@ -213,7 +213,7 @@ fun GalleryNavHost(
           data =
             CustomTaskDataForBuiltinTask(
               modelManagerViewModel = modelManagerViewModel,
-              onNavUp = { navController.navigate(ROUTE_MODEL_MANAGER) },
+              onNavUp = { navController.navigate(ROUTE_HOMESCREEN) },
             )
         )
       }
