@@ -31,6 +31,7 @@
   <string name="app_name" translatable="false">Android Jarvis</string>
   <string name="app_name_first_part" translatable="false">Android</string>
   <string name="app_name_second_part" translatable="false">Jarvis</string>
+  <string name="cd_jarvis_brand_art" translatable="true" description="Accessibility description for the Android Jarvis brand artwork. [CHAR_LIMIT=80]">Android Jarvis neon robot emblem</string>
   <string name="askimage_emptystate_title" translatable="false">Ask Image</string>
   <string name="askimage_emptystate_content" translatable="true" description="Instructions shown when starting a chat with image input, explaining how to add images (up to 10). [CHAR_LIMIT=120]">To get started, tap the + below to add an image (max 10 images per chat) and type a prompt to ask a question about it!</string>
   <string name="askimage_emptystate_content_aicore" translatable="true" description="Instructions shown when starting a chat with image input for AICore models, explaining how to add a single image. [CHAR_LIMIT=118]">To get started, tap the + below to add an image (max 1 image per chat) and type a prompt to ask a question about it!</string>
@@ -548,6 +549,8 @@
   <string name="retry" translatable="true" description="Label for a button to retry a failed operation (e.g., reloading data). [CHAR_LIMIT=7]">Retry</string>
   <!-- Title of the theme selection setting. -->
   <string name="theme_title" translatable="true" description="Label for the settings section or configuration key where users can choose the visual theme of the app (e.g., Light, Dark). [CHAR_LIMIT=7]">Theme</string>
+  <string name="settings_jarvis_theme_name" translatable="false">Jarvis Neon</string>
+  <string name="settings_jarvis_theme_description" translatable="true" description="Description of the fixed Android Jarvis visual theme. [CHAR_LIMIT=100]">Black interface with neon-green text and highlights, inspired by the Jarvis emblem.</string>
   <!-- Title of the section for third-party libraries in settings. -->
   <string name="third_party_libraries" translatable="true" description="Label for the settings section that contains information about third-party libraries used in the app. [CHAR_LIMIT=23]">Third-party libraries</string>
   <!-- Button label to view licenses of third-party libraries. -->

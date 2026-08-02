@@ -68,7 +68,7 @@ fun GalleryTopAppBar(
         ) {
           if (title == stringResource(R.string.app_name)) {
             Icon(
-              painterResource(R.drawable.logo),
+              painterResource(R.drawable.jarvis_brand_icon),
               modifier = Modifier.size(20.dp),
               contentDescription = null,
               tint = Color.Unspecified,

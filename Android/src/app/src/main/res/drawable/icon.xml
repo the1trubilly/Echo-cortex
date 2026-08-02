@@ -1,31 +1,7 @@
-<!--
- Copyright 2026 Google LLC
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-     http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
--->
-
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-  <path
-      android:fillColor="#FF1A73E8"
-      android:pathData="M54,22A32,32 0,1 1,54 86A32,32 0,1 1,54 22Z" />
-  <path
-      android:fillColor="#FFFFFFFF"
-      android:pathData="M48,36L65,36L65,61C65,72 58,79 48,79C38,79 32,74 30,65L41,62C42,67 44,69 49,69C53,69 55,66 55,61L55,46L48,46Z" />
-  <path
-      android:fillColor="#FFD7B5FF"
-      android:pathData="M77,25L80,31L86,34L80,37L77,43L74,37L68,34L74,31Z" />
-</vector>
+<?xml version="1.0" encoding="utf-8"?>
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/jarvis_brand_icon"
+    android:antialias="true"
+    android:dither="true"
+    android:filter="true"
+    android:gravity="fill" />

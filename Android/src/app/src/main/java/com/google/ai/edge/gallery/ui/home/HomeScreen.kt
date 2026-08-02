@@ -518,7 +518,6 @@ fun HomeScreen(
   // Settings dialog.
   if (showSettingsDialog) {
     SettingsDialog(
-      curThemeOverride = modelManagerViewModel.readThemeOverride(),
       curFirebaseAnalytics = modelManagerViewModel.readFirebaseAnalytics(),
       modelManagerViewModel = modelManagerViewModel,
       onDismissed = { showSettingsDialog = false },
@@ -637,19 +636,31 @@ fun AppTitleGm4(enableAnimation: Boolean) {
     withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(text2) }
   }
 
-  RevealingText(
-    text = "",
-    annotatedText = annotatedText,
-    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
-    animationDelay = 0,
-    animationDurationMs =
-      if (enableAnimation) {
-        (TITLE_FIRST_LINE_ANIMATION_DURATION + TITLE_SECOND_LINE_ANIMATION_DURATION)
-      } else {
-        0
-      },
-    extraTextPadding = 0.dp,
-  )
+  Column(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.spacedBy(8.dp),
+  ) {
+    Image(
+      painter = painterResource(R.drawable.jarvis_brand_poster),
+      contentDescription = stringResource(R.string.cd_jarvis_brand_art),
+      contentScale = ContentScale.Fit,
+      modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(24.dp)),
+    )
+    RevealingText(
+      text = "",
+      annotatedText = annotatedText,
+      style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
+      animationDelay = 0,
+      animationDurationMs =
+        if (enableAnimation) {
+          (TITLE_FIRST_LINE_ANIMATION_DURATION + TITLE_SECOND_LINE_ANIMATION_DURATION)
+        } else {
+          0
+        },
+      extraTextPadding = 0.dp,
+    )
+  }
 }
 
 @Composable
