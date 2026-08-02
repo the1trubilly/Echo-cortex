@@ -724,7 +724,7 @@ fun SkillManagerBottomSheet(
             showDisclaimerDialog = true
           }
           AddSkillOptionType.ViewCommunitySkills -> {
-            showCommunitySkillsBottomSheet = true
+            showDisclaimerDialog = true
           }
           else -> {}
         }
@@ -777,10 +777,10 @@ fun SkillManagerBottomSheet(
         addSkillOptionTypeToConfirm = null
       },
       onConfirm = {
-        addSkillOptionTypeToConfirm?.let { type ->
-          if (type == AddSkillOptionType.LocalImport) {
-            showAddSkillFromLocalImportDialog = true
-          }
+        when (addSkillOptionTypeToConfirm) {
+          AddSkillOptionType.LocalImport -> showAddSkillFromLocalImportDialog = true
+          AddSkillOptionType.ViewCommunitySkills -> showCommunitySkillsBottomSheet = true
+          else -> {}
         }
         showDisclaimerDialog = false
         addSkillOptionTypeToConfirm = null
@@ -811,12 +811,13 @@ fun ViewCommunitySkillsBottomSheet(
   var installingSkillName by remember { mutableStateOf<String?>(null) }
   var installedSkillName by remember { mutableStateOf<String?>(null) }
   var installError by remember { mutableStateOf<String?>(null) }
+  var selectedCatalogUrl by remember { mutableStateOf(AgentSkillsURLs.DISCUSSIONS) }
   val webViewClient =
     remember(context) {
       CommunitySkillsWebViewClient(
         context = context,
-        onInstallRequested = { skillUrl ->
-          val skillName = getOfficialFeaturedSkillName(skillUrl)
+        onInstallRequested = { request ->
+          val skillName = getCatalogSkillDisplayName(request)
           if (skillName == null) {
             installError = context.getString(R.string.skill_install_invalid_source)
           } else if (installingSkillName == null) {
@@ -824,16 +825,17 @@ fun ViewCommunitySkillsBottomSheet(
             installedSkillName = null
             installError = null
             skillManagerViewModel.validateAndAddSkillFromUrl(
-              url = skillUrl,
+              url = request.skillUrl,
               onSuccess = {
                 installingSkillName = null
                 installedSkillName = skillName
-                webView?.evaluateJavascript(markSkillInstalledScript(skillName), null)
+                webView?.evaluateJavascript(markSkillInstalledScript(request.buttonKey), null)
                 onSkillAdded()
               },
               onValidationError = { error ->
                 installingSkillName = null
                 installError = error
+                webView?.evaluateJavascript(markSkillInstallFailedScript(request.buttonKey), null)
               },
             )
           }
@@ -908,16 +910,59 @@ fun ViewCommunitySkillsBottomSheet(
         )
       }
 
+      Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+      ) {
+        if (selectedCatalogUrl == AgentSkillsURLs.DISCUSSIONS) {
+          FilledTonalButton(onClick = {}) {
+            Text(stringResource(R.string.community_skills_tab))
+          }
+        } else {
+          OutlinedButton(
+            onClick = {
+              selectedCatalogUrl = AgentSkillsURLs.DISCUSSIONS
+              webView?.loadUrl(selectedCatalogUrl)
+            }
+          ) {
+            Text(stringResource(R.string.community_skills_tab))
+          }
+        }
+        if (selectedCatalogUrl == AgentSkillsURLs.FEATURED) {
+          FilledTonalButton(onClick = {}) {
+            Text(stringResource(R.string.featured_skills_tab))
+          }
+        } else {
+          OutlinedButton(
+            onClick = {
+              selectedCatalogUrl = AgentSkillsURLs.FEATURED
+              webView?.loadUrl(selectedCatalogUrl)
+            }
+          ) {
+            Text(stringResource(R.string.featured_skills_tab))
+          }
+        }
+      }
+
       GalleryWebView(
         modifier = Modifier.fillMaxWidth().weight(1f),
-        initialUrl = AgentSkillsURLs.FEATURED,
+        initialUrl = selectedCatalogUrl,
         preventParentScrolling = true,
         customWebViewClient = webViewClient,
         onWebViewCreated = { createdWebView ->
           webView = createdWebView
           createdWebView.addJavascriptInterface(
-            CommunitySkillInstallerBridge { skillUrl ->
-              createdWebView.post { webViewClient.requestInstall(skillUrl) }
+            CommunitySkillInstallerBridge { skillUrl, buttonKey, displayName ->
+              createdWebView.post {
+                webViewClient.requestInstall(
+                  CatalogSkillInstallRequest(
+                    catalogPageUrl = createdWebView.url.orEmpty(),
+                    skillUrl = skillUrl,
+                    buttonKey = buttonKey,
+                    displayName = displayName,
+                  )
+                )
+              }
             },
             "AndroidJarvisSkills",
           )
@@ -929,6 +974,14 @@ fun ViewCommunitySkillsBottomSheet(
 
 private const val INSTALL_SKILL_SCHEME = "jarvis-install"
 private const val OFFICIAL_FEATURED_SKILL_PATH = "/google-ai-edge/gallery/tree/main/skills/featured/"
+private const val OFFICIAL_DISCUSSION_PATH = "/google-ai-edge/gallery/discussions/"
+
+private data class CatalogSkillInstallRequest(
+  val catalogPageUrl: String,
+  val skillUrl: String,
+  val buttonKey: String,
+  val displayName: String,
+)
 
 private fun getOfficialFeaturedSkillName(url: String): String? {
   val uri = Uri.parse(url)
@@ -948,15 +1001,63 @@ private fun getOfficialFeaturedSkillName(url: String): String? {
   return segments[6].takeIf { it.isNotBlank() }
 }
 
-private fun markSkillInstalledScript(skillName: String): String {
-  val safeName = skillName.replace("\\", "\\\\").replace("'", "\\'")
+private fun isOfficialCommunityCatalogPage(url: String): Boolean {
+  val uri = Uri.parse(url)
+  if (uri.scheme != "https" || uri.host != "github.com") return false
+  val segments = uri.pathSegments
+  if (
+    segments.size < 4 ||
+      segments[0] != "google-ai-edge" ||
+      segments[1] != "gallery" ||
+      segments[2] != "discussions"
+  ) {
+    return false
+  }
+  return segments[3].toIntOrNull() != null ||
+    (segments.size >= 5 && segments[3] == "categories" && segments[4] == "skills")
+}
+
+private fun getCatalogSkillDisplayName(request: CatalogSkillInstallRequest): String? {
+  getOfficialFeaturedSkillName(request.skillUrl)?.let { featuredSkillName ->
+    return featuredSkillName.takeIf {
+      request.catalogPageUrl.startsWith(AgentSkillsURLs.FEATURED)
+    }
+  }
+  if (!isOfficialCommunityCatalogPage(request.catalogPageUrl)) return null
+
+  val skillUri = Uri.parse(request.skillUrl)
+  if (skillUri.scheme != "https" || skillUri.host.isNullOrBlank()) return null
+  if (isOfficialCommunityCatalogPage(request.skillUrl)) return null
+
+  val requestedName = request.displayName.trim().replace(Regex("\\s+"), " ").take(80)
+  return requestedName.takeIf { it.isNotBlank() }
+    ?: skillUri.lastPathSegment?.takeIf { it.isNotBlank() }
+    ?: skillUri.host
+}
+
+private fun markSkillInstalledScript(buttonKey: String): String {
+  val safeKey = buttonKey.replace("\\", "\\\\").replace("'", "\\'")
   return """
     (function() {
-      var button = document.querySelector("button[data-jarvis-skill='$safeName']");
+      var button = document.querySelector("button[data-jarvis-skill='$safeKey']");
       if (button) {
-        button.textContent = '✓';
+        button.textContent = '\u2713';
         button.disabled = true;
-        button.setAttribute('aria-label', '$safeName installed');
+        button.setAttribute('aria-label', 'Skill installed');
+      }
+    })();
+  """
+    .trimIndent()
+}
+
+private fun markSkillInstallFailedScript(buttonKey: String): String {
+  val safeKey = buttonKey.replace("\\", "\\\\").replace("'", "\\'")
+  return """
+    (function() {
+      var button = document.querySelector("button[data-jarvis-skill='$safeKey']");
+      if (button) {
+        button.textContent = '+';
+        button.disabled = false;
       }
     })();
   """
@@ -965,16 +1066,28 @@ private fun markSkillInstalledScript(skillName: String): String {
 
 private class CommunitySkillsWebViewClient(
   context: Context,
-  private val onInstallRequested: (String) -> Unit,
+  private val onInstallRequested: (CatalogSkillInstallRequest) -> Unit,
 ) : BaseGalleryWebViewClient(context = context) {
-  fun requestInstall(url: String) {
-    onInstallRequested(url)
+  fun requestInstall(request: CatalogSkillInstallRequest) {
+    onInstallRequested(request)
   }
 
   override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
     val uri = request?.url ?: return false
     if (uri.scheme == INSTALL_SKILL_SCHEME) {
-      uri.getQueryParameter("url")?.let(onInstallRequested)
+      val skillUrl = uri.getQueryParameter("url")
+      val buttonKey = uri.getQueryParameter("key")
+      val displayName = uri.getQueryParameter("name")
+      if (skillUrl != null && buttonKey != null && displayName != null) {
+        onInstallRequested(
+          CatalogSkillInstallRequest(
+            catalogPageUrl = view?.url.orEmpty(),
+            skillUrl = skillUrl,
+            buttonKey = buttonKey,
+            displayName = displayName,
+          )
+        )
+      }
       return true
     }
     return false
@@ -983,19 +1096,23 @@ private class CommunitySkillsWebViewClient(
   override fun onPageFinished(view: WebView?, url: String?) {
     super.onPageFinished(view, url)
     if (url?.startsWith(AgentSkillsURLs.FEATURED) == true) {
-      view?.evaluateJavascript(INJECT_INSTALL_BUTTONS_SCRIPT, null)
+      view?.evaluateJavascript(INJECT_FEATURED_INSTALL_BUTTONS_SCRIPT, null)
+    } else if (isOfficialCommunityCatalogPage(url.orEmpty())) {
+      view?.evaluateJavascript(INJECT_COMMUNITY_INSTALL_BUTTONS_SCRIPT, null)
     }
   }
 }
 
-private class CommunitySkillInstallerBridge(private val onInstallRequested: (String) -> Unit) {
+private class CommunitySkillInstallerBridge(
+  private val onInstallRequested: (String, String, String) -> Unit
+) {
   @JavascriptInterface
-  fun install(url: String) {
-    onInstallRequested(url)
+  fun install(url: String, buttonKey: String, displayName: String) {
+    onInstallRequested(url, buttonKey, displayName)
   }
 }
 
-private val INJECT_INSTALL_BUTTONS_SCRIPT =
+private val INJECT_FEATURED_INSTALL_BUTTONS_SCRIPT =
   """
     (function() {
       var pathPrefix = '$OFFICIAL_FEATURED_SKILL_PATH';
@@ -1024,10 +1141,12 @@ private val INJECT_INSTALL_BUTTONS_SCRIPT =
             event.stopPropagation();
             var skillUrl = 'https://github.com' + href;
             if (window.AndroidJarvisSkills && window.AndroidJarvisSkills.install) {
-              window.AndroidJarvisSkills.install(skillUrl);
+              window.AndroidJarvisSkills.install(skillUrl, skillName, skillName);
             } else {
               window.location.href =
-                '$INSTALL_SKILL_SCHEME://skill?url=' + encodeURIComponent(skillUrl);
+                '$INSTALL_SKILL_SCHEME://skill?url=' + encodeURIComponent(skillUrl) +
+                '&key=' + encodeURIComponent(skillName) +
+                '&name=' + encodeURIComponent(skillName);
             }
           });
 
@@ -1040,6 +1159,161 @@ private val INJECT_INSTALL_BUTTONS_SCRIPT =
       if (!window.__jarvisSkillObserver) {
         window.__jarvisSkillObserver = new MutationObserver(decorateSkillLinks);
         window.__jarvisSkillObserver.observe(document.body, { childList: true, subtree: true });
+      }
+    })();
+  """
+    .trimIndent()
+
+private val INJECT_COMMUNITY_INSTALL_BUTTONS_SCRIPT =
+  """
+    (function() {
+      var discussionPathPrefix = '$OFFICIAL_DISCUSSION_PATH';
+
+      function normalizeHeading(text) {
+        return (text || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      }
+
+      function validSkillUrl(href, discussionUrl) {
+        try {
+          var url = new URL(href, discussionUrl);
+          if (url.protocol !== 'https:') return null;
+          if (
+            url.hostname === 'github.com' &&
+            url.pathname.indexOf('$OFFICIAL_DISCUSSION_PATH') === 0
+          ) return null;
+          return url.href.replace(/\/$/, '');
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function firstLinkAfterHeading(body, wantedHeading, discussionUrl) {
+        var headings = body.querySelectorAll('h1,h2,h3,h4,h5,h6,strong');
+        for (var index = 0; index < headings.length; index++) {
+          var heading = headings[index];
+          if (normalizeHeading(heading.textContent) !== wantedHeading) continue;
+
+          var sectionStart = heading.closest('p') || heading;
+          var sibling = sectionStart.nextElementSibling;
+          while (sibling) {
+            if (/^H[1-6]$/.test(sibling.tagName)) break;
+            var anchor = sibling.matches('a[href]') ? sibling : sibling.querySelector('a[href]');
+            if (anchor) {
+              var skillUrl = validSkillUrl(anchor.getAttribute('href'), discussionUrl);
+              if (skillUrl) return skillUrl;
+            }
+            sibling = sibling.nextElementSibling;
+          }
+        }
+        return null;
+      }
+
+      function extractSkillUrl(html, discussionUrl) {
+        var parsed = new DOMParser().parseFromString(html, 'text/html');
+        var bodies = Array.prototype.slice.call(parsed.querySelectorAll('.markdown-body'));
+        var body = bodies.find(function(candidate) {
+          return /skill\s+webhost\s+path/i.test(candidate.textContent || '');
+        }) || bodies[0];
+        if (!body) return null;
+
+        var webhost = firstLinkAfterHeading(body, 'skill webhost path', discussionUrl);
+        if (webhost) return webhost;
+
+        var directSkillFile = Array.prototype.slice.call(body.querySelectorAll('a[href]')).find(
+          function(anchor) {
+            try {
+              return new URL(anchor.getAttribute('href'), discussionUrl).pathname.endsWith('/SKILL.md');
+            } catch (error) {
+              return false;
+            }
+          }
+        );
+        if (directSkillFile) {
+          return validSkillUrl(directSkillFile.getAttribute('href'), discussionUrl);
+        }
+
+        return firstLinkAfterHeading(body, 'skill source repository', discussionUrl);
+      }
+
+      function requestInstall(skillUrl, buttonKey, displayName) {
+        if (window.AndroidJarvisSkills && window.AndroidJarvisSkills.install) {
+          window.AndroidJarvisSkills.install(skillUrl, buttonKey, displayName);
+        } else {
+          window.location.href =
+            '$INSTALL_SKILL_SCHEME://skill?url=' + encodeURIComponent(skillUrl) +
+            '&key=' + encodeURIComponent(buttonKey) +
+            '&name=' + encodeURIComponent(displayName);
+        }
+      }
+
+      function decorateDiscussionLinks() {
+        var links = document.querySelectorAll("a[href*='" + discussionPathPrefix + "']");
+        links.forEach(function(link) {
+          var linkUrl;
+          try {
+            linkUrl = new URL(link.getAttribute('href'), window.location.href);
+          } catch (error) {
+            return;
+          }
+          if (linkUrl.hostname !== 'github.com') return;
+          var href = linkUrl.pathname.replace(/\/$/, '');
+          var match = href.match(/^\/google-ai-edge\/gallery\/discussions\/(\d+)$/);
+          if (!match) return;
+
+          var displayName = (link.textContent || '').replace(/\s+/g, ' ').trim();
+          if (!displayName || /^\d+$/.test(displayName)) return;
+          var titleContainer = link.closest('h2,h3,h4') || link.parentElement;
+          if (!titleContainer) return;
+
+          var buttonKey = 'discussion-' + match[1];
+          if (document.querySelector("button[data-jarvis-skill='" + buttonKey + "']")) return;
+
+          var button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = '+';
+          button.setAttribute('data-jarvis-skill', buttonKey);
+          button.setAttribute('aria-label', 'Install ' + displayName);
+          button.style.cssText =
+            'margin-left:12px;min-width:34px;height:30px;border:1px solid #39ff14;' +
+            'border-radius:15px;background:#071007;color:#39ff14;font-size:22px;' +
+            'font-weight:700;line-height:24px;cursor:pointer;z-index:1000;';
+          button.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            event.stopPropagation();
+            if (button.disabled) return;
+            button.disabled = true;
+            button.textContent = '\u2026';
+
+            var discussionUrl = 'https://github.com' + href;
+            fetch(discussionUrl, { credentials: 'same-origin' })
+              .then(function(response) {
+                if (!response.ok) throw new Error('Could not open the community skill page.');
+                return response.text();
+              })
+              .then(function(html) {
+                var skillUrl = extractSkillUrl(html, discussionUrl);
+                if (!skillUrl) throw new Error('This post does not declare an installable skill URL.');
+                requestInstall(skillUrl, buttonKey, displayName);
+              })
+              .catch(function(error) {
+                button.disabled = false;
+                button.textContent = '+';
+                window.location.href = discussionUrl;
+              });
+          });
+
+          titleContainer.appendChild(button);
+        });
+      }
+
+      decorateDiscussionLinks();
+      if (!window.__jarvisCommunitySkillObserver) {
+        window.__jarvisCommunitySkillObserver = new MutationObserver(decorateDiscussionLinks);
+        window.__jarvisCommunitySkillObserver.observe(document.body, {
+          childList: true,
+          subtree: true
+        });
       }
     })();
   """

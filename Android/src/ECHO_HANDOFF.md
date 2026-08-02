@@ -1,6 +1,44 @@
 # Android Jarvis — Echo Handoff
 
-## Current milestone: truthful Jarvis runtime self-knowledge
+## Current milestone: full Community Skills catalog
+
+### Scope completed
+
+- Replaced the featured-only catalog landing page with the official Edge Gallery Community Skills GitHub Discussions category, while retaining Featured as a second tab.
+- Injected the same neon `+` install control beside numbered community discussion entries.
+- Made each community button fetch its discussion and resolve the author-declared `Skill Webhost Path`, with direct `SKILL.md` and declared source-repository fallbacks.
+- Kept all installation behind the existing native `SkillManager` fetch, parser, duplicate check, persistence, and enabled-selection path.
+- Restricted the expanded JavaScript bridge to official Edge Gallery catalog/category/numbered-discussion pages; arbitrary pages opened inside the WebView cannot invoke native installation.
+- Added the existing third-party skill warning before entering the community catalog and preserved manual URL/local import fallbacks.
+
+### Exact files changed
+
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/SkillManagerBottomSheet.kt` — adds Community/Featured tabs, community discussion button injection and URL resolution, native catalog-page gating, installation state feedback, and disclaimer routing.
+- `app/src/main/res/values/strings.xml` — renames the entry to Community Skills, explains the combined catalog, and labels both tabs.
+- `ECHO_BRIEF.md` — replaces the obsolete featured-only rule with the durable community-catalog and bridge-security decisions.
+- `ECHO_HANDOFF.md` — records this milestone and its verified evidence.
+
+### Commands and evidence
+
+- The initial `gradlew.bat assembleDebug` returned `BUILD SUCCESSFUL` in 37 seconds; the final `gradlew.bat testDebugUnitTest assembleDebug` returned `BUILD SUCCESSFUL` in 16 seconds.
+- Installing `app/build/outputs/apk/debug/app-debug.apk` on USB device `R5CX31PBW7V` returned `Success`.
+- A cold launch returned `Status: ok`, `LaunchState: COLD`, and no `AndroidRuntime` startup failure.
+- The device displayed the third-party warning before opening Community Skills.
+- The live Community tab rendered multiple non-featured discussions, including Web Search and Second Brain entries, each with a neon `+` button.
+- The Featured tab remained available and rendered `mood-music`, `restaurant-roulette`, and `virtual-piano` with the same `+` behavior.
+- No community skill was installed merely for testing; the user's saved custom-skill state was not changed.
+
+### Unresolved problems
+
+- Community posts are user-contributed and can be stale, malformed, or unsafe. The warning and parser remain mandatory; this catalog must never be described as curated or endorsed.
+- A GitHub DOM or discussion-template redesign could require selector/resolver maintenance. Failure currently leaves the skill uninstalled and opens the discussion for inspection.
+- Full cloud-model Skill execution still depends on the separate OpenAI Responses tool-call loop milestone.
+
+### Recommended next step
+
+Add provider-neutral Skill/MCP tool calling to the OpenAI Responses executor so every successfully installed community skill can be invoked by the GPT-5.6 tiers from the unified Jarvis chat.
+
+## Previous milestone: truthful Jarvis runtime self-knowledge
 
 ### Scope completed
 
