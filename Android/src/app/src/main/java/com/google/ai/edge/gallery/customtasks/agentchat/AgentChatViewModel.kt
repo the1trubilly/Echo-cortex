@@ -18,9 +18,11 @@ package com.google.ai.edge.gallery.customtasks.agentchat
 
 import android.util.Log
 import androidx.datastore.core.DataStore
+import com.google.ai.edge.gallery.agent.AgentRequest
 import com.google.ai.edge.gallery.agent.AgentChatExecutor
 import com.google.ai.edge.gallery.agent.AgentRuntimeExecutor
 import com.google.ai.edge.gallery.cortex.CortexExchangeCaptureRequest
+import com.google.ai.edge.gallery.cortex.CortexRecallRequest
 import com.google.ai.edge.gallery.cortex.CortexRuntime
 import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.Model
@@ -44,6 +46,25 @@ constructor(
   private val cortexRuntime: CortexRuntime,
 ) :
 LlmChatViewModel(systemPromptRepository, userDataDataStore, runtimeExecutor) {
+
+  override suspend fun buildRequestMetadata(model: Model, input: String): Map<String, Any> {
+    val packet =
+      cortexRuntime.recall(
+        CortexRecallRequest(query = input, currentSessionId = currentSessionId)
+      )
+    return if (packet.verified && packet.contextForModel.isNotBlank()) {
+      Log.i(
+        TAG,
+        "Cortex recalled ${packet.artifactIds.size} verified artifacts with receipt ${packet.receiptId}.",
+      )
+      mapOf(AgentRequest.CORTEX_RECALL_CONTEXT to packet.contextForModel)
+    } else {
+      if (packet.message.isNotBlank() && packet.receiptId.isNotBlank()) {
+        Log.w(TAG, "Cortex recall ${packet.receiptId} was not verified: ${packet.message}")
+      }
+      emptyMap()
+    }
+  }
 
   override suspend fun onResponseCompleted(model: Model, input: String) {
     val messages = uiState.value.messagesByModel[model.name].orEmpty()

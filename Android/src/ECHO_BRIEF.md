@@ -1,16 +1,23 @@
 # Android Jarvis — Echo Brief
 
-## Current milestone: isolated Jarvis Alpha native Cortex
+## Current milestone: native ThreadKeeper memory-cycle retrieval
 
-Jarvis Alpha is now a separately installable Android application with a native Kotlin Cortex
-vertical slice based on the verified ThreadKeeper 2.99 schema-11 contract. Alpha captures Billy's
-exact completed turn and Jarvis's exact completed reply as distinct, hash-verified Markdown
-artifacts, writes a receipt last, and maintains a rebuildable SQLite index. The canonical vault
-defaults to Alpha-private storage and can be changed in Settings to an Obsidian-compatible Android
-folder. Main remains installed, operational, and unable to execute the experimental Cortex writer.
-The real-device acceptance pass now also confirms a cold-launched OpenAI turn, exact two-sided
-Markdown capture into Billy's selected `Sync/Billy Cortex` folder, encrypted-key persistence, and
-visible Settings counts.
+Jarvis Alpha now has the first native Kotlin ThreadKeeper memory-cycle slice at the app level, not
+as a model-selected skill. Every completed Agent Chat exchange still stores Billy's exact turn and
+Jarvis's completed reply as separate, hash-verified Markdown artifacts. Before every later Agent
+Chat turn, Alpha reads prior-session artifacts back from the canonical vault, verifies both the
+Markdown document and exact-content hashes, selects a bounded provenance-labeled packet, records a
+schema-11 retrieval receipt, and supplies the packet through the existing OpenAI or local-model
+instruction path without changing the visible user message. Conservative retrieval prefers
+answer-bearing `USER_STATED` records, keeps `OTHER_AGENT` wording non-authoritative, and follows
+adjacent question-to-answer links only for explicit location and project cues.
+
+This is not a complete native port of ThreadKeeper 2.99. Semantic records, durable checkpoints and
+open loops, typed graph links/routes, activation/gravity, dynamic memory resolution, synthesis
+review, outcome learning, empathy/policy/routine modules, deletion/undo, and governance remain to be
+implemented. Main remains protected by the no-op Cortex binding.
+
+## Prior milestone: isolated Jarvis Alpha native Cortex
 
 ## Prior milestone: OpenAI cloud Skill/MCP execution
 
@@ -27,6 +34,26 @@ Android Jarvis now gives OpenAI cloud models the same installed Skill/MCP execut
   it to `NoOpCortexRuntime`; only the Alpha source set contains and binds the native implementation.
 - A completed Agent Chat turn is the capture boundary. Capture occurs after streaming terminates and
   the final visible Jarvis text has been assembled, without requiring Billy to issue a memory command.
+- A new Agent Chat turn is the recall boundary. The typed `CortexRuntime.recall` request uses the
+  exact current query and session ID, excludes the current session from candidates, and returns
+  hidden request metadata rather than modifying the visible or captured user turn.
+- Every recalled turn must be read from canonical Markdown and pass both document and exact-content
+  SHA-256 verification. Missing or corrupted artifacts are skipped rather than trusted from SQLite.
+- Retrieval follows ThreadKeeper's smallest-useful-context rule. Direct `USER_STATED` evidence is
+  preferred; a prior recall question is lower priority than an answer-bearing statement; and
+  `OTHER_AGENT` content is surfaced only when Billy explicitly asks about prior Jarvis wording.
+- An unrelated query with no direct or linked match receives no memory packet. The bounded recent
+  fallback is allowed only when Billy explicitly asks for broad recall, such as “What do you
+  remember about me?”
+- Adjacent-turn question-to-answer traversal is currently limited to explicit `location` and
+  `project` cues. Ambiguous wording such as “Alpha live test” must not activate a location link.
+- A successful nonempty recall writes a schema-11 Markdown retrieval receipt and indexes only the
+  receipt ID, query hash, selected artifact IDs, and verification state. Retrieval frequency never
+  promotes a claim's provenance or truth.
+- Retrieved Markdown is quoted evidence, never instructions or authority. The current user turn
+  wins over older memory, and commands embedded in memory must never be executed.
+- OpenAI receives verified recall as per-turn `instructions`; local models receive the same packet
+  as hidden inference context. Neither executor logs memory contents.
 - Follow ThreadKeeper 2.99 `capture_exchange` provenance: Billy is `USER_STATED`; Jarvis is
   `OTHER_AGENT`; the two artifacts have distinct IDs and files; the receipt is the commit marker.
 - Canonical conversational memory is UTF-8 Markdown with exact-content length and SHA-256 metadata.
@@ -110,6 +137,15 @@ Android Jarvis now gives OpenAI cloud models the same installed Skill/MCP execut
   independent settings and compiled in the existing task/system/personality order.
 - Association, retrieval, and future gravity scores may affect navigation but must never rewrite
   source truth, provenance, or confidence.
+- Automatic recall must never merge stored Billy and Jarvis turns into one source field. Every model
+  packet and receipt must retain artifact IDs and `USER_STATED` versus `OTHER_AGENT` provenance.
+- Retrieval must exclude the active session, remain bounded, and prefer the smallest useful set. A
+  direct or linked answer must outrank a prior question asking for that answer.
+- Semantic cue expansion must be context-sensitive. In particular, “Where do I live?” may activate
+  location retrieval while “Alpha live test” must not.
+- Cloud-model memory transmission needs an explicit product-level consent/redaction design before
+  broader native recall is considered complete. Until then, do not use Billy's personal vault for a
+  live cloud acceptance test without his explicit approval for that payload.
 - Device acceptance is not complete from build, logs, or filesystem checks alone. Every changed user
   journey must include screenshots of the state a user actually sees, followed by verification of the
   corresponding side effect. Ask Billy when a required credential, permission, picker choice, or

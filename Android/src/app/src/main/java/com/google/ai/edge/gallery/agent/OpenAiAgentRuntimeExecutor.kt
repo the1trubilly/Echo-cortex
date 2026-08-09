@@ -117,6 +117,11 @@ constructor(
           val openAiTools = OpenAiToolJson.fromLiteRtDescriptions(toolManager.getToolsDescription())
           val visibleText = StringBuilder()
           var completedTurn = false
+          val recallContext =
+            (request.metadata[AgentRequest.CORTEX_RECALL_CONTEXT] as? String).orEmpty()
+          val turnInstructions =
+            if (recallContext.isBlank()) systemInstruction
+            else "$systemInstruction\n\n$recallContext"
 
           toolLoop@ for (round in 0 until MAX_TOOL_ROUNDS) {
             val requestItems = synchronized(conversationItems) { conversationItems.toList() }
@@ -126,7 +131,7 @@ constructor(
                 request =
                   OpenAiResponseRequest(
                     model = currentModel.name,
-                    instructions = systemInstruction,
+                    instructions = turnInstructions,
                     inputItems = requestItems,
                     safetyIdentifier = credentialsRepository.getOrCreateSafetyIdentifier(),
                     tools = openAiTools,

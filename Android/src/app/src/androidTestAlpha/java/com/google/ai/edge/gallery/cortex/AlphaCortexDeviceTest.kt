@@ -19,7 +19,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class AlphaCortexDeviceTest {
   @Test
-  fun capturesBillyAndJarvisAsSeparateVerifiedMarkdownArtifacts() = runBlocking {
+  fun capturesAndRecallsBillyAndJarvisAsVerifiedMarkdownArtifacts() = runBlocking {
     // Use a disposable cache-rooted context, never Billy's canonical Alpha or Main data.
     val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
     val context = TemporaryCortexContext(targetContext)
@@ -27,9 +27,11 @@ class AlphaCortexDeviceTest {
     val before = runtime.status.value
     val turnsDirectory = File(context.filesDir, "cortex-vault/turns")
     val receiptsDirectory = File(context.filesDir, "cortex-vault/receipts")
+    val retrievalDirectory = File(context.filesDir, "cortex-vault/retrieval-receipts")
     val turnNamesBefore = turnsDirectory.listFiles()?.map(File::getName)?.toSet().orEmpty()
     val receiptNamesBefore = receiptsDirectory.listFiles()?.map(File::getName)?.toSet().orEmpty()
-    val billyExact = "Device-test Billy turn\nwith Markdown: **exact**"
+    val billyExact =
+      "Device-test Billy turn\nI live in Greenwood, Delaware.\nwith Markdown: **exact**"
     val jarvisExact = "Device-test Jarvis reply\nwith Unicode: 🧠"
 
     val receipt =
@@ -68,13 +70,33 @@ class AlphaCortexDeviceTest {
     assertEquals(jarvisExact, contentBySource[CortexSourceKind.OTHER_AGENT])
     assertTrue("verified: true" in newReceiptFiles.single().readText())
 
+    val retrievalNamesBefore =
+      retrievalDirectory.listFiles()?.map(File::getName)?.toSet().orEmpty()
+    val recall =
+      runtime.recall(
+        CortexRecallRequest(
+          query = "Where do I live?",
+          currentSessionId = "device-test-new-session",
+        )
+      )
+    assertTrue(recall.message, recall.verified)
+    assertTrue(recall.contextForModel.contains("Greenwood, Delaware"))
+    assertEquals(1, recall.artifactIds.size)
+    val retrievalFiles =
+      retrievalDirectory.listFiles().orEmpty().filter { file -> file.name !in retrievalNamesBefore }
+    assertEquals(1, retrievalFiles.size)
+    assertTrue("document_type: memory_cycle_retrieval_receipt" in retrievalFiles.single().readText())
+    assertTrue("verified: true" in retrievalFiles.single().readText())
+
     val after = runtime.status.value
     assertEquals(before.verifiedExchanges + 1, after.verifiedExchanges)
     assertEquals(before.verifiedArtifacts + 2, after.verifiedArtifacts)
+    assertEquals(before.verifiedRecalls + 1, after.verifiedRecalls)
     val reopenedIndex = CortexIndexDatabase(context)
     try {
       assertEquals(after.verifiedExchanges, reopenedIndex.counts().exchanges)
       assertEquals(after.verifiedArtifacts, reopenedIndex.counts().artifacts)
+      assertEquals(after.verifiedRecalls, reopenedIndex.counts().retrievals)
     } finally {
       reopenedIndex.close()
     }

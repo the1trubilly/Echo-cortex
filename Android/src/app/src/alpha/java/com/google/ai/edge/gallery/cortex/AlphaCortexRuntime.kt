@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 
 data class AlphaCortexStatus(
   val vaultLabel: String,
@@ -18,6 +20,7 @@ data class AlphaCortexStatus(
   val verifiedExchanges: Int,
   val verifiedArtifacts: Int,
   val verifiedImports: Int,
+  val verifiedRecalls: Int,
   val lastOperation: String,
   val healthy: Boolean,
 )
@@ -169,6 +172,109 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
       }
     }
 
+  override suspend fun recall(request: CortexRecallRequest): CortexRecallPacket =
+    withContext(Dispatchers.IO) {
+      mutationMutex.withLock {
+        val receiptId = UUID.randomUUID().toString()
+        try {
+          require(request.query.isNotBlank()) { "Recall query is empty." }
+          val maxArtifacts = request.maxArtifacts.coerceIn(1, 24)
+          val maxContextChars = request.maxContextChars.coerceIn(1_000, 16_000)
+          val indexedCandidates =
+            index.recentRecallCandidates(
+              excludedSessionId = request.currentSessionId,
+              limit = (maxArtifacts * 8).coerceAtLeast(96),
+            )
+          val readableCandidates =
+            indexedCandidates.mapNotNull { candidate ->
+              runCatching {
+                  val document =
+                    vault.readVerified(candidate.markdownLocation, candidate.documentHash)
+                  val exactBytes = CortexMarkdownCodec.decodeExactContent(document)
+                  require(CortexHashing.sha256(exactBytes) == candidate.contentHash) {
+                    "Cortex exact-content hash verification failed."
+                  }
+                  ReadableRecallCandidate(
+                    artifactId = candidate.artifactId,
+                    exchangeId = candidate.exchangeId,
+                    sessionId = candidate.sessionId,
+                    sourceKind = candidate.sourceKind,
+                    capturedAtEpochMs = candidate.capturedAtEpochMs,
+                    exactContent = exactBytes.toString(Charsets.UTF_8),
+                  )
+                }
+                .getOrNull()
+            }
+          val selected =
+            CortexRecallEngine.select(
+              candidatesNewestFirst = readableCandidates,
+              query = request.query,
+              maxArtifacts = maxArtifacts,
+              maxContextChars = maxContextChars,
+            )
+          if (selected.isEmpty()) {
+            return@withLock CortexRecallPacket(
+              contextForModel = "",
+              artifactIds = emptyList(),
+              receiptId = "",
+              verified = true,
+              message = "No prior verified artifacts were available for this session.",
+            )
+          }
+
+          val recalledAt = System.currentTimeMillis()
+          val queryHash = CortexHashing.sha256(request.query)
+          val receiptBytes =
+            CortexMarkdownCodec.encodeRetrievalReceipt(
+              receiptId = receiptId,
+              sessionId = request.currentSessionId,
+              queryHash = queryHash,
+              recalledAtEpochMs = recalledAt,
+              candidateCount = readableCandidates.size,
+              selected = selected,
+            )
+          val receipt =
+            vault.writeVerified(
+              category = "retrieval-receipts",
+              fileName = "${recalledAt}_${receiptId}_recall.md",
+              mimeType = "text/markdown",
+              bytes = receiptBytes,
+            )
+          val artifactIds = selected.map { it.candidate.artifactId }
+          val artifactIdsJson =
+            buildJsonArray { artifactIds.forEach { artifactId -> add(JsonPrimitive(artifactId)) } }
+              .toString()
+          index.recordRetrieval(
+            receiptId = receiptId,
+            sessionId = request.currentSessionId,
+            queryHash = queryHash,
+            recalledAtEpochMs = recalledAt,
+            receipt = receipt,
+            artifactIdsJson = artifactIdsJson,
+          )
+          _status.value =
+            readStatus("Last recall verified (${selected.size} artifacts)", healthy = true)
+          CortexRecallPacket(
+            contextForModel = CortexRecallEngine.buildModelContext(selected),
+            artifactIds = artifactIds,
+            receiptId = receiptId,
+            verified = true,
+            message = "Verified native Cortex memory-cycle retrieval.",
+          )
+        } catch (error: Exception) {
+          val message = error.message ?: "Cortex recall failed."
+          _status.value = readStatus("Recall failed: $message", healthy = false)
+          CortexRecallPacket(
+            contextForModel = "",
+            artifactIds = emptyList(),
+            receiptId = receiptId,
+            verified = false,
+            message = message,
+          )
+        }
+      }
+    }
+
   fun setVaultTree(uri: Uri) {
     vault.setTreeUri(uri)
     _status.value = readStatus("Selected vault folder saved", healthy = true)
@@ -282,6 +388,7 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
       verifiedExchanges = counts.exchanges,
       verifiedArtifacts = counts.artifacts,
       verifiedImports = counts.imports,
+      verifiedRecalls = counts.retrievals,
       lastOperation = lastOperation,
       healthy = healthy,
     )

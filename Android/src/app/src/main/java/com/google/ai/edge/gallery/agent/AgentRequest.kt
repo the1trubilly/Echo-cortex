@@ -30,5 +30,6 @@ data class AgentRequest(
 ) {
   companion object {
     const val LITERTLM_EXTRA_CONTEXT = "litertlm_extra_context"
+    const val CORTEX_RECALL_CONTEXT = "cortex_recall_context"
   }
 }

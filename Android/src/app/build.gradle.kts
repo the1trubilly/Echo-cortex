@@ -48,6 +48,7 @@ android {
     manifestPlaceholders["galleryDeepLinkScheme"] = "com.google.ai.edge.gallery"
 
     buildConfigField("String", "FEEDBACK_API_KEY", "\"\"")
+    buildConfigField("boolean", "NATIVE_CORTEX_ENABLED", "false")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -60,6 +61,7 @@ android {
       isDebuggable = true
       signingConfig = signingConfigs.getByName("debug")
       matchingFallbacks += listOf("debug")
+      buildConfigField("boolean", "NATIVE_CORTEX_ENABLED", "true")
       manifestPlaceholders["appAuthRedirectScheme"] = "com.google.aiedge.gallery.alpha.auth"
       manifestPlaceholders["galleryDeepLinkScheme"] = "com.google.ai.edge.gallery.alpha"
     }

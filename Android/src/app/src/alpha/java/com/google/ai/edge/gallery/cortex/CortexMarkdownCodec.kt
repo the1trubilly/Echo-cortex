@@ -154,6 +154,41 @@ internal object CortexMarkdownCodec {
       }
       .toByteArray(StandardCharsets.UTF_8)
 
+  fun encodeRetrievalReceipt(
+    receiptId: String,
+    sessionId: String,
+    queryHash: String,
+    recalledAtEpochMs: Long,
+    candidateCount: Int,
+    selected: List<SelectedRecallArtifact>,
+  ): ByteArray =
+    buildString {
+        appendLine("---")
+        appendLine("threadkeeper_schema: 11")
+        appendLine("document_type: memory_cycle_retrieval_receipt")
+        appendLine("receipt_id: ${yaml(receiptId)}")
+        appendLine("session_id: ${yaml(sessionId)}")
+        appendLine("query_sha256: $queryHash")
+        appendLine("recalled_at: ${yaml(Instant.ofEpochMilli(recalledAtEpochMs).toString())}")
+        appendLine("candidate_count: $candidateCount")
+        appendLine("selected_count: ${selected.size}")
+        appendLine("verified: true")
+        appendLine("---")
+        appendLine()
+        appendLine("# Native Cortex retrieval receipt")
+        appendLine()
+        appendLine("This receipt records why bounded memory artifacts surfaced. Retrieval is navigation")
+        appendLine("evidence only; frequency and activation never promote a claim's truth status.")
+        appendLine()
+        selected.forEachIndexed { index, artifact ->
+          appendLine(
+            "${index + 1}. `${artifact.candidate.artifactId}` | " +
+              "`${artifact.candidate.sourceKind.name}` | ${artifact.whySurfaced}"
+          )
+        }
+      }
+      .toByteArray(StandardCharsets.UTF_8)
+
   private fun yaml(value: String): String =
     buildString {
       append('"')

@@ -33,6 +33,7 @@ object JarvisRuntimeSelfModel {
     enabledSkillNames: List<String>,
     enabledMcpToolNames: List<String>,
     appVersion: String = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+    nativeCortexEnabled: Boolean = BuildConfig.NATIVE_CORTEX_ENABLED,
   ): String {
     val baseInstructions = removeExistingSection(systemInstructions)
     val modelDisplayName = model.displayName.ifBlank { model.name }
@@ -58,6 +59,18 @@ object JarvisRuntimeSelfModel {
           "Enabled Skills and MCP tools run through Android Jarvis's tool dispatcher, with " +
             "Android permissions and explicit confirmation where required."
       }
+    val memoryDescription =
+      if (nativeCortexEnabled) {
+        "Jarvis Alpha's native Kotlin Cortex saves Billy's exact turn and Jarvis's completed " +
+          "reply separately as Markdown. Before each Agent Chat turn, it retrieves a bounded, " +
+          "hash-verified packet from prior sessions with strict USER_STATED versus OTHER_AGENT " +
+          "provenance and writes a retrieval receipt. This is the first native ThreadKeeper " +
+          "memory-cycle slice; semantic records, links, checkpoints, synthesis, and outcome " +
+          "learning are not implemented yet."
+      } else {
+        "Native long-term Cortex memory is disabled in this build. Saved chat history and any " +
+          "explicitly enabled memory skill are the only available continuity mechanisms."
+      }
 
     val runtimeSection =
       """
@@ -72,7 +85,7 @@ object JarvisRuntimeSelfModel {
       - Enabled MCP tools: $mcpSummary.
       - Tool execution status: $toolExecutionDescription
       - Prompt assembly order: task instructions, saved System Instructions, saved Personality Prompt, then this authoritative runtime section.
-      - Memory status: Android Jarvis owns the current conversation transcript and saved chat history. When an enabled memory skill is available, you should retrieve and record useful continuity automatically under the memory behavior rules. The planned native long-term Markdown/Obsidian memory organ is not implemented yet.
+      - Memory status: $memoryDescription
       - Self-extension status: you cannot currently edit the APK or source code, grant yourself permissions, or autonomously install/update tools. You may inspect the facts provided here, explain the architecture, and propose additions. Future self-extension must use an app-level propose, review, install, test, and rollback flow with user approval.
 
       Runtime truth rules:

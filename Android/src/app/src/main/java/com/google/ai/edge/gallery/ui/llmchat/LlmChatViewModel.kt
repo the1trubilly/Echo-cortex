@@ -162,12 +162,10 @@ open class LlmChatViewModelBase(
         allowThinking &&
           model.getBooleanConfigValue(key = ConfigKeys.ENABLE_THINKING, defaultValue = false)
       val extraContext = if (enableThinking) mapOf("enable_thinking" to "true") else emptyMap()
-      val metadata =
-        if (extraContext.isNotEmpty()) {
-          mapOf(AgentRequest.LITERTLM_EXTRA_CONTEXT to extraContext)
-        } else {
-          emptyMap()
-        }
+      val metadata = buildRequestMetadata(model = model, input = input).toMutableMap()
+      if (extraContext.isNotEmpty()) {
+        metadata[AgentRequest.LITERTLM_EXTRA_CONTEXT] = extraContext
+      }
 
       val request = AgentRequest(query = input, attachments = attachments, metadata = metadata)
 
@@ -313,6 +311,10 @@ open class LlmChatViewModelBase(
 
   /** Runs after the final streamed response is assembled and before the UI completion callback. */
   protected open suspend fun onResponseCompleted(model: Model, input: String) = Unit
+
+  /** Supplies task-specific hidden request context without changing the user's visible exact turn. */
+  protected open suspend fun buildRequestMetadata(model: Model, input: String): Map<String, Any> =
+    emptyMap()
 
   fun stopResponse(model: Model) {
     Log.d(TAG, "Stopping response for model ${model.name}...")

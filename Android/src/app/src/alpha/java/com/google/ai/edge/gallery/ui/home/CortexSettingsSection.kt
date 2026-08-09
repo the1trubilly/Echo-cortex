@@ -56,7 +56,7 @@ internal fun CortexSettingsSection() {
     rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
       if (uri != null) {
         importInProgress = true
-        importMessage = "Inspecting a read-only schema-11 copy…"
+        importMessage = "Inspecting a read-only schema-11 copy..."
         scope.launch {
           val result = runtime.importSchema11Copy(uri)
           importMessage = result.message
@@ -73,7 +73,8 @@ internal fun CortexSettingsSection() {
     Text(
       text =
         "Jarvis saves Billy's exact turn and his own completed reply as separate Markdown " +
-          "memories. SQLite is only a rebuildable index.",
+          "memories. Before each new turn, Jarvis automatically retrieves a small, verified " +
+          "memory packet from prior sessions. SQLite is only a rebuildable index.",
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -84,8 +85,9 @@ internal fun CortexSettingsSection() {
     )
     Text(
       text =
-        "${status.verifiedExchanges} verified exchanges · " +
-          "${status.verifiedArtifacts} turn files · ${status.verifiedImports} imports",
+        "${status.verifiedExchanges} verified exchanges | " +
+          "${status.verifiedArtifacts} turn files | ${status.verifiedRecalls} recalls | " +
+          "${status.verifiedImports} imports",
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -106,7 +108,7 @@ internal fun CortexSettingsSection() {
       enabled = !importInProgress,
       onClick = { importPicker.launch(arrayOf("application/json", "text/plain")) },
     ) {
-      Text(if (importInProgress) "Importing…" else "Import ThreadKeeper schema-11 copy")
+      Text(if (importInProgress) "Importing..." else "Import ThreadKeeper schema-11 copy")
     }
     if (importMessage.isNotBlank() || status.lastOperation != "Ready") {
       Text(

@@ -1,6 +1,123 @@
 # Android Jarvis — Echo Handoff
 
-## Current milestone: isolated Jarvis Alpha native Cortex
+## Current milestone: native Cortex cross-session recall
+
+### Scope completed
+
+- Reproduced Billy's real failure: the selected vault contained the exact interview answer with
+  `Greenwood Delaware`, but a later session answered that it had no reliable personal history.
+  Capture was working; no native retrieval path existed.
+- Added typed app-level recall requests and packets to `CortexRuntime`. Main/release remain no-op;
+  Alpha performs automatic recall before every Agent Chat turn.
+- Added a hidden request-metadata hook so retrieval does not alter the displayed user message or the
+  exact Markdown later captured for that turn.
+- Added canonical Markdown readback with document and exact-content SHA-256 verification. SQLite is
+  used only to locate prior-session candidates.
+- Added conservative bounded selection with strict `USER_STATED`/`OTHER_AGENT` handling,
+  answer-bearing-statement preference, simple normalization, and adjacent question-to-answer links
+  limited to explicit location and project cues.
+- Added provider-neutral injection: OpenAI receives the verified packet through per-turn
+  `instructions`; local models receive it as hidden inference context.
+- Added schema-11 Markdown retrieval receipts plus a version-2 SQLite migration and visible recall
+  counts in Alpha Settings.
+- Updated Jarvis's runtime self-model to truthfully report this first native memory-cycle slice and
+  explicitly name the ThreadKeeper modules that are still missing.
+
+### Exact files changed
+
+- `app/build.gradle.kts` - exposes an Alpha-only native-Cortex BuildConfig fact.
+- `app/src/main/java/com/google/ai/edge/gallery/cortex/CortexRuntime.kt` - typed recall request/packet
+  boundary and Main-safe no-op behavior.
+- `app/src/main/java/com/google/ai/edge/gallery/agent/AgentRequest.kt` - hidden Cortex recall metadata key.
+- `app/src/main/java/com/google/ai/edge/gallery/ui/llmchat/LlmChatViewModel.kt` - task-specific hidden
+  request-metadata hook.
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/AgentChatViewModel.kt` - automatic
+  pre-turn recall and existing post-turn exact capture.
+- `app/src/main/java/com/google/ai/edge/gallery/agent/OpenAiAgentRuntimeExecutor.kt` - appends verified
+  recall to per-turn OpenAI instructions.
+- `app/src/main/java/com/google/ai/edge/gallery/agent/DefaultAgentRuntimeExecutor.kt` - prepends the
+  same verified packet to local inference without changing the visible query.
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/JarvisRuntimeSelfModel.kt` -
+  truthful Alpha memory capability and remaining-limit description.
+- `app/src/alpha/java/com/google/ai/edge/gallery/cortex/CortexRecallEngine.kt` - bounded selection,
+  provenance rules, question/statement typing, explicit semantic links, and inert model packet.
+- `app/src/alpha/java/com/google/ai/edge/gallery/cortex/AlphaCortexRuntime.kt` - verified readback,
+  selection, receipt commit, indexing, status, and failure handling.
+- `app/src/alpha/java/com/google/ai/edge/gallery/cortex/CortexVault.kt` - verified vault reads.
+- `app/src/alpha/java/com/google/ai/edge/gallery/cortex/CortexIndexDatabase.kt` - prior-session query,
+  retrieval receipts, counts, and non-destructive version-1-to-2 migration.
+- `app/src/alpha/java/com/google/ai/edge/gallery/cortex/CortexMarkdownCodec.kt` - deterministic
+  schema-11 retrieval receipts.
+- `app/src/alpha/java/com/google/ai/edge/gallery/ui/home/CortexSettingsSection.kt` - automatic-recall
+  explanation and verified recall count.
+- `app/src/testAlpha/java/com/google/ai/edge/gallery/cortex/CortexRecallEngineTest.kt` - 9 retrieval
+  regressions, including buried Greenwood linkage, provenance, bounds, question typing, and the
+  `live` location-polysemy privacy case.
+- `app/src/androidTestAlpha/java/com/google/ai/edge/gallery/cortex/AlphaCortexDeviceTest.kt` - local-only
+  real-device capture, cross-session Greenwood recall, Markdown receipt, and reopened-index test.
+- `app/src/test/java/com/google/ai/edge/gallery/customtasks/agentchat/JarvisRuntimeSelfModelTest.kt` -
+  Alpha-enabled and Main-disabled memory truth.
+- `docs/test-evidence/2026-08-09-alpha-recall-failure-before.png` - visible reproduced failure.
+- `docs/test-evidence/2026-08-09-alpha-native-cortex-settings-final.png` - final installed Alpha
+  Settings with selected vault, Markdown counts, and recall receipts.
+- `ECHO_BRIEF.md` and `ECHO_HANDOFF.md` - corrected architecture, evidence, limitations, and next work.
+
+### Commands and evidence
+
+- `gradlew.bat --no-daemon testAlphaUnitTest assembleAlpha` passed after the final selector changes:
+  28 Alpha unit tests, zero failures.
+- `gradlew.bat --no-daemon testDebugUnitTest assembleDebug` passed: shared Main chat code and the
+  protected no-op Cortex binding still compile and pass their existing tests.
+- Final `app-alpha.apk` update-install returned `Success` without clearing app data. The encrypted
+  OpenAI credential preference and selected-vault preference remained present.
+- Manual instrumentation on phone `R5CX31PBW7V` passed `AlphaCortexDeviceTest` 1/1. It used a
+  disposable cache-rooted context, captured exact Billy/Jarvis Markdown, recalled Greenwood from a
+  different session, wrote a verified retrieval receipt, and reopened the migrated index. Only the
+  test-runner package was uninstalled afterward.
+- The final installed app cold-launched with no `AndroidRuntime` crash. The user-visible Settings
+  screenshot shows `Sync/Billy Cortex`, 11 verified exchanges, 22 turn files, and 3 recall receipts.
+- The first pre-final cloud selector was too broad: receipt
+  `7ef91c1f-8ac6-4cb7-ae99-673de5518701` selected 7 artifacts, including Billy's interview. A later
+  pre-final semantic-link selector incorrectly treated “Alpha live” as location and again included
+  the interview. Those two OpenAI requests occurred; later code added smallest-context, explicit-cue,
+  polysemy, and question-versus-statement regressions. This privacy incident is recorded explicitly.
+- A final live cloud recall was not run. The safety gate requires Billy's explicit approval before
+  transmitting any further recalled vault packet to OpenAI. Do not claim the final cloud response is
+  verified; local selection/injection tests, device receipt tests, builds, launch, and Settings are verified.
+- Repository credential scan found no OpenAI key or known key fragment in source/docs outside ignored
+  build output. No plaintext key was printed or added.
+
+### Not yet verified or implemented
+
+- The final selector has not been accepted against Billy's real interview through OpenAI because
+  explicit authorization to transmit that recalled personal packet is still required.
+- This is not the complete ThreadKeeper 2.99 system. Native semantic records, durable checkpoints
+  and open loops, general typed links/routes, activation/gravity, dynamic memory resolution,
+  synthesis review, outcome learning, empathy/policy/routine modules, deletion/undo, and governance
+  remain unimplemented.
+- Current semantic question-to-answer links cover explicit location and project intents only. Other
+  concepts use exact lexical evidence; a bounded recent fallback runs only for an explicit broad
+  recall request.
+- No embeddings, HipoRAG/LiteRAG/RAPTOR layers, Matryoshka vectors, summarization hierarchy, or
+  second-model encoder exists yet.
+- No user-facing cloud-memory consent/preview control exists yet.
+
+### Questions requiring Echo's architectural judgment
+
+- Should automatic cloud recall use a standing per-provider consent, a per-turn preview, or a local
+  redaction/sensitivity gate before any vault content leaves the phone?
+- Should the next native record layer extract one atomic Markdown fact per claim while retaining an
+  exact pointer to the source turn, or introduce checkpoint/open-loop records first?
+- Which additional semantic link categories are safe to add deterministically before the planned
+  on-device encoder is available?
+
+### Recommended next step
+
+Add native atomic semantic records and checkpoint/open-loop notes derived from exact source turns,
+with source pointers and reviewable Markdown. Then add a visible cloud-memory consent/redaction
+boundary before expanding retrieval beyond the current conservative location/project links.
+
+## Prior milestone: isolated Jarvis Alpha native Cortex
 
 ### Scope completed
 

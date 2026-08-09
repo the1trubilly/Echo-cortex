@@ -39,9 +39,28 @@ data class CortexCaptureReceipt(
   val message: String,
 )
 
+/** A bounded automatic-recall request evaluated before an Agent Chat turn. */
+data class CortexRecallRequest(
+  val query: String,
+  val currentSessionId: String,
+  val maxArtifacts: Int = 12,
+  val maxContextChars: Int = 6_000,
+)
+
+/** Verified memory context for the internal agent boundary; external-transmission policy is separate. */
+data class CortexRecallPacket(
+  val contextForModel: String,
+  val artifactIds: List<String>,
+  val receiptId: String,
+  val verified: Boolean,
+  val message: String,
+)
+
 /** Typed app-level boundary for Cortex. Main builds bind this to a no-op; Alpha binds it natively. */
 interface CortexRuntime {
   suspend fun captureExchange(request: CortexExchangeCaptureRequest): CortexCaptureReceipt
+
+  suspend fun recall(request: CortexRecallRequest): CortexRecallPacket
 }
 
 /** Deliberately inert implementation used outside the isolated Jarvis Alpha build. */
@@ -51,6 +70,15 @@ object NoOpCortexRuntime : CortexRuntime {
   ): CortexCaptureReceipt =
     CortexCaptureReceipt(
       exchangeId = "",
+      verified = false,
+      message = "Cortex is disabled for this build.",
+    )
+
+  override suspend fun recall(request: CortexRecallRequest): CortexRecallPacket =
+    CortexRecallPacket(
+      contextForModel = "",
+      artifactIds = emptyList(),
+      receiptId = "",
       verified = false,
       message = "Cortex is disabled for this build.",
     )

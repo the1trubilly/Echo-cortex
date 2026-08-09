@@ -39,6 +39,7 @@ class JarvisRuntimeSelfModelTest {
         enabledSkillNames = listOf("research", "calendar"),
         enabledMcpToolNames = listOf("search_web"),
         appVersion = "test-version",
+        nativeCortexEnabled = true,
       )
 
     assertTrue(result.contains("Active model shown to the user: OpenAI · GPT-5.6 Medium"))
@@ -49,6 +50,9 @@ class JarvisRuntimeSelfModelTest {
     assertTrue(result.contains("Enabled MCP tools: search_web"))
     assertTrue(result.contains("OpenAI Responses function calls run through"))
     assertTrue(result.contains("Tool results are returned to the model"))
+    assertTrue(result.contains("native Kotlin Cortex"))
+    assertTrue(result.contains("retrieves a bounded, hash-verified packet"))
+    assertTrue(result.contains("semantic records, links, checkpoints"))
     assertTrue(result.indexOf("## Saved Personality Prompt") < result.indexOf(JarvisRuntimeSelfModel.SECTION_HEADER))
   }
 
@@ -66,12 +70,14 @@ class JarvisRuntimeSelfModelTest {
         enabledSkillNames = listOf("notes"),
         enabledMcpToolNames = emptyList(),
         appVersion = "test-version",
+        nativeCortexEnabled = false,
       )
 
     assertTrue(result.contains("on-device LiteRT-LM"))
     assertTrue(result.contains("Current accepted inputs: text, audio clips"))
     assertTrue(result.contains("Enabled Skills and MCP tools run through"))
     assertFalse(result.contains("Current accepted inputs: text, images"))
+    assertTrue(result.contains("Native long-term Cortex memory is disabled"))
   }
 
   @Test

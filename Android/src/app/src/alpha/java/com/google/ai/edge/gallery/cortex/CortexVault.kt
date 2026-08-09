@@ -49,6 +49,21 @@ internal class CortexVault(private val context: Context) {
     } ?: writePrivate(safeCategory, safeFileName, bytes)
   }
 
+  fun readVerified(location: String, expectedDocumentSha256: String): ByteArray {
+    val bytes =
+      if (location.startsWith("content://")) {
+        context.contentResolver.openInputStream(Uri.parse(location))?.use { stream ->
+          stream.readBytes()
+        } ?: error("The selected Cortex document is no longer readable.")
+      } else {
+        File(location).readBytes()
+      }
+    require(CortexHashing.sha256(bytes) == expectedDocumentSha256) {
+      "Cortex document hash verification failed."
+    }
+    return bytes
+  }
+
   private fun writePrivate(
     category: String,
     fileName: String,

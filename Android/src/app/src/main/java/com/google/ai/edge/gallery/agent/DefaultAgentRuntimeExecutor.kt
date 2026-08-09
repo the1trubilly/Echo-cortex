@@ -108,6 +108,14 @@ open class DefaultAgentRuntimeExecutor(
     val curModel =
       this@DefaultAgentRuntimeExecutor.model
         ?: error("Model not initialized in DefaultAgentRuntimeExecutor")
+    val recallContext =
+      (request.metadata[AgentRequest.CORTEX_RECALL_CONTEXT] as? String).orEmpty()
+    val inferenceInput =
+      if (recallContext.isBlank()) {
+        request.query
+      } else {
+        "$recallContext\n\n--- CURRENT USER MESSAGE ---\n${request.query}"
+      }
     if (curModel.instance == null) {
       try {
         curModel.awaitInitialization()
@@ -124,7 +132,7 @@ open class DefaultAgentRuntimeExecutor(
     }
     curModel.runtimeHelper.runInference(
       model = curModel,
-      input = request.query,
+      input = inferenceInput,
       images = images,
       audioClips = audioClips,
       extraContext = extraContext,
