@@ -1,10 +1,40 @@
 # Android Jarvis — Echo Brief
 
-## Current milestone
+## Current milestone: isolated Jarvis Alpha native Cortex
+
+Jarvis Alpha is now a separately installable Android application with a native Kotlin Cortex
+vertical slice based on the verified ThreadKeeper 2.99 schema-11 contract. Alpha captures Billy's
+exact completed turn and Jarvis's exact completed reply as distinct, hash-verified Markdown
+artifacts, writes a receipt last, and maintains a rebuildable SQLite index. The canonical vault
+defaults to Alpha-private storage and can be changed in Settings to an Obsidian-compatible Android
+folder. Main remains installed, operational, and unable to execute the experimental Cortex writer.
+
+## Prior milestone: OpenAI cloud Skill/MCP execution
 
 Android Jarvis now gives OpenAI cloud models the same installed Skill/MCP execution bridge as local agent models. The OpenAI Responses loop sends the existing tool inventory, preserves model output items, executes function calls sequentially through Android Jarvis's permission-aware dispatcher, returns each confirmed tool result to the model, and continues until the model answers. The built-in `jarvis-system-core` skill remains stateless, while the default agent behavior now retrieves and records continuity automatically when an enabled memory skill is available.
 
 ## Permanent architecture decisions
+
+- Main is the protected known-good application. Experimental Cortex work must run in the separate
+  `com.google.aiedge.gallery.alpha` application and must never be promoted automatically.
+- Only Billy can explicitly authorize promotion from Alpha to Main.
+- Alpha uses the launcher name `Jarvis Alpha`, a separate deep-link scheme, debug signing, its own
+  Android UID, and its own app-data directory. Main keeps `com.google.aiedge.gallery`.
+- The app-level Cortex boundary is the typed Kotlin `CortexRuntime` API. Debug Main and release bind
+  it to `NoOpCortexRuntime`; only the Alpha source set contains and binds the native implementation.
+- A completed Agent Chat turn is the capture boundary. Capture occurs after streaming terminates and
+  the final visible Jarvis text has been assembled, without requiring Billy to issue a memory command.
+- Follow ThreadKeeper 2.99 `capture_exchange` provenance: Billy is `USER_STATED`; Jarvis is
+  `OTHER_AGENT`; the two artifacts have distinct IDs and files; the receipt is the commit marker.
+- Canonical conversational memory is UTF-8 Markdown with exact-content length and SHA-256 metadata.
+  The native SQLite database is a rebuildable index and must never become the only copy of memory.
+- Before Billy chooses a vault, Alpha writes atomically to its private `cortex-vault`. A selected
+  Android document-tree folder receives future verified artifacts under `Jarvis Alpha Cortex`.
+- A selected ThreadKeeper import is always a read-only copy operation. Alpha accepts schema 11,
+  hashes and archives the exact source bytes, emits Markdown collection snapshots, writes a receipt,
+  and deduplicates by source SHA-256. It never reads or rewrites Main's live WebView database.
+- The `TK-2.99.zip` artifact in phone Downloads is reference implementation code, not user memory.
+  Its phone copy remains untouched.
 
 - Preserve the upstream package, namespace, Kotlin class names, resource filenames, task IDs, JavaScript bridge names, and source links unless a later migration explicitly requires changing them.
 - Keep the existing task-specific system prompt feature. It remains stored per task by `SystemPromptRepository` in `UserData`.
@@ -65,6 +95,16 @@ Android Jarvis now gives OpenAI cloud models the same installed Skill/MCP execut
 
 ## Non-negotiable requirements
 
+- Main and Alpha must remain installable side by side with independent application data.
+- Alpha must never clear, overwrite, migrate in place, or silently copy Main's settings or memories.
+- Billy's exact message and Jarvis's exact completed response must both be persisted distinctly.
+- A successful capture requires verified Markdown turn files and a receipt written after both.
+- The Cortex/ThreadKeeper vault location must be choosable in Alpha Settings without a loaded model.
+- System Instructions and Personality Prompt behavior must remain available in Alpha, stored as two
+  independent settings and compiled in the existing task/system/personality order.
+- Association, retrieval, and future gravity scores may affect navigation but must never rewrite
+  source truth, provenance, or confidence.
+
 - System Instructions and Personality Prompt must remain independently editable and independently stored.
 - Both settings must persist across app process death and reopening.
 - Prompt editing must not require a downloaded or initialized model.
@@ -85,6 +125,22 @@ Android Jarvis now gives OpenAI cloud models the same installed Skill/MCP execut
 - Do not claim a build, install, launch, device behavior, or persistence result without command/device evidence.
 
 ## Relevant repository discoveries
+
+- The Android project root is `Android/src`; the Git root is two levels above it.
+- The untouched branch was `main`, ahead of `origin/main` by 11 commits. Billy's untracked `.idea/`
+  directory and `gradle/gradle-daemon-jvm.properties` predated this milestone and were preserved.
+- The Alpha checkpoint lives on `jarvis-alpha-native-cortex`; the `main` branch pointer was not moved.
+- The baseline `testDebugUnitTest assembleDebug` completed successfully before Alpha edits.
+- The connected device is `R5CX31PBW7V`. Main version 1.0.17 was already installed at
+  `/data/user/0/com.google.aiedge.gallery` and launched with its existing Jarvis conversation intact.
+- ThreadKeeper 2.99.0 uses schema 11 and the WebView key `threadkeeper_database_v1`; its supplied
+  Node/WebView test suite passed 40/40 from a temporary copy.
+- The phone archive SHA-256 was
+  `B4C880A77691BBEC1061640AFBF4861B2C1F4978CF4E503BE583DC242F360734`.
+- Existing Agent Chat has a definitive `LoopTerminated` event after streamed text assembly. That is
+  the native post-turn capture seam.
+- Current Jarvis supports local/cloud routing, images, audio, Skills, MCP, and Android permission
+  prompts. It does not yet contain a native host terminal/ADB authority system.
 
 - Gradle project root: `Android/src`; single Android application module: `:app`.
 - Git repository root: `Echo-cortex`; branch: `main` tracking `origin/main`.

@@ -45,6 +45,7 @@ android {
         "REPLACE_WITH_YOUR_REDIRECT_SCHEME_IN_HUGGINGFACE_APP"
     manifestPlaceholders["applicationName"] = "com.google.ai.edge.gallery.GalleryApplication"
     manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
+    manifestPlaceholders["galleryDeepLinkScheme"] = "com.google.ai.edge.gallery"
 
     buildConfigField("String", "FEEDBACK_API_KEY", "\"\"")
 
@@ -52,12 +53,23 @@ android {
   }
 
   buildTypes {
+    create("alpha") {
+      initWith(getByName("debug"))
+      applicationIdSuffix = ".alpha"
+      versionNameSuffix = "-alpha"
+      isDebuggable = true
+      signingConfig = signingConfigs.getByName("debug")
+      matchingFallbacks += listOf("debug")
+      manifestPlaceholders["appAuthRedirectScheme"] = "com.google.aiedge.gallery.alpha.auth"
+      manifestPlaceholders["galleryDeepLinkScheme"] = "com.google.ai.edge.gallery.alpha"
+    }
     release {
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("debug")
     }
   }
+  testBuildType = "alpha"
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11

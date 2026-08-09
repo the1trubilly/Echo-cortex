@@ -16,14 +16,23 @@
 
 package com.google.ai.edge.gallery.customtasks.agentchat
 
+import android.util.Log
 import androidx.datastore.core.DataStore
 import com.google.ai.edge.gallery.agent.AgentChatExecutor
 import com.google.ai.edge.gallery.agent.AgentRuntimeExecutor
+import com.google.ai.edge.gallery.cortex.CortexExchangeCaptureRequest
+import com.google.ai.edge.gallery.cortex.CortexRuntime
+import com.google.ai.edge.gallery.data.BuiltInTaskId
+import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.SystemPromptRepository
 import com.google.ai.edge.gallery.proto.UserData
+import com.google.ai.edge.gallery.ui.common.chat.ChatMessageText
+import com.google.ai.edge.gallery.ui.common.chat.ChatSide
 import com.google.ai.edge.gallery.ui.llmchat.LlmChatViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+
+private const val TAG = "AGAgentChatViewModel"
 
 @HiltViewModel
 class AgentChatViewModel
@@ -32,5 +41,43 @@ constructor(
   systemPromptRepository: SystemPromptRepository,
   userDataDataStore: DataStore<UserData>,
   @AgentChatExecutor runtimeExecutor: AgentRuntimeExecutor,
+  private val cortexRuntime: CortexRuntime,
 ) :
-LlmChatViewModel(systemPromptRepository, userDataDataStore, runtimeExecutor)
+LlmChatViewModel(systemPromptRepository, userDataDataStore, runtimeExecutor) {
+
+  override suspend fun onResponseCompleted(model: Model, input: String) {
+    val messages = uiState.value.messagesByModel[model.name].orEmpty()
+    val lastUserIndex =
+      messages.indexOfLast { message ->
+        message is ChatMessageText && message.side == ChatSide.USER
+      }
+    if (lastUserIndex < 0) return
+
+    val userMessage = (messages[lastUserIndex] as ChatMessageText).content
+    val assistantResponse =
+      messages
+        .drop(lastUserIndex + 1)
+        .filterIsInstance<ChatMessageText>()
+        .lastOrNull { message -> message.side == ChatSide.AGENT }
+        ?.content
+        .orEmpty()
+    if (userMessage.isEmpty() || assistantResponse.isEmpty()) return
+
+    val receipt =
+      cortexRuntime.captureExchange(
+        CortexExchangeCaptureRequest(
+          sessionId = currentSessionId,
+          taskId = BuiltInTaskId.LLM_AGENT_CHAT,
+          modelName = model.name,
+          userMessage = userMessage,
+          assistantResponse = assistantResponse,
+          completedAtEpochMs = System.currentTimeMillis(),
+        )
+      )
+    if (receipt.verified) {
+      Log.i(TAG, "Cortex captured verified exchange ${receipt.exchangeId}.")
+    } else if (receipt.exchangeId.isNotEmpty()) {
+      Log.w(TAG, "Cortex capture ${receipt.exchangeId} was not verified: ${receipt.message}")
+    }
+  }
+}

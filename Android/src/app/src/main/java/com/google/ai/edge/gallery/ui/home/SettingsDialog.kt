@@ -390,6 +390,8 @@ fun SettingsDialog(
             }
           }
 
+          CortexSettingsSection()
+
           // HF Token management.
           Column(
             modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},

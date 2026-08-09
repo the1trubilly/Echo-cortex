@@ -289,6 +289,11 @@ open class LlmChatViewModelBase(
             }
             setInProgress(false)
             setPreparing(false)
+            try {
+              onResponseCompleted(model = model, input = input)
+            } catch (e: Exception) {
+              Log.e(TAG, "Post-response completion hook failed.", e)
+            }
             onDone()
           }
           is AgentEvent.Error -> {
@@ -305,6 +310,9 @@ open class LlmChatViewModelBase(
       }
     }
   }
+
+  /** Runs after the final streamed response is assembled and before the UI completion callback. */
+  protected open suspend fun onResponseCompleted(model: Model, input: String) = Unit
 
   fun stopResponse(model: Model) {
     Log.d(TAG, "Stopping response for model ${model.name}...")
