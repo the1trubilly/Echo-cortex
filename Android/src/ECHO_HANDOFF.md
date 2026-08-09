@@ -2,6 +2,26 @@
 
 ## Current milestone: native Cortex cross-session recall
 
+### Follow-up: real broad-recall acceptance failure and fix
+
+- Billy tested the actual chat prompt `Hey Echo what do you remember about me`. Jarvis visibly
+  replied that the only verified memory was Billy previously asking that same question.
+- Receipt `757e064e-628c-4ac9-a62a-37b72637db3f` proved the selector chose one `USER_STATED`
+  artifact only because it overlapped on `hey` and `echo`. The broad-recall fallback never ran
+  because ordinary lexical selection took precedence.
+- Explicit broad recall now bypasses lexical selection and ranks durable Billy statements only.
+  Structured interview answers and explicit identity/location/preference/project/goal/belief
+  statements qualify; questions, recall prompts, test commands, reminders, and other requests do not.
+- The exact production failure is a permanent regression fixture: newer copies of the `Hey Echo`
+  question plus newer validation/reminder commands must lose to the older numbered interview.
+- A temporary read-only instrumentation audit ran the final selector against Billy's real vault with
+  the exact prompt. It selected exactly one artifact, the structured interview containing Greenwood.
+  It did not call OpenAI, write a receipt, or remain in the repository.
+- User-visible cloud-response acceptance is still pending explicit authorization to transmit the
+  selected interview packet to OpenAI. The installed final code, actual-vault selection, disposable
+  phone runtime, builds, and screenshot of the failure are verified; do not claim the corrected
+  cloud answer is verified yet.
+
 ### Scope completed
 
 - Reproduced Billy's real failure: the selected vault contained the exact interview answer with
@@ -50,7 +70,7 @@
   schema-11 retrieval receipts.
 - `app/src/alpha/java/com/google/ai/edge/gallery/ui/home/CortexSettingsSection.kt` - automatic-recall
   explanation and verified recall count.
-- `app/src/testAlpha/java/com/google/ai/edge/gallery/cortex/CortexRecallEngineTest.kt` - 9 retrieval
+- `app/src/testAlpha/java/com/google/ai/edge/gallery/cortex/CortexRecallEngineTest.kt` - 11 retrieval
   regressions, including buried Greenwood linkage, provenance, bounds, question typing, and the
   `live` location-polysemy privacy case.
 - `app/src/androidTestAlpha/java/com/google/ai/edge/gallery/cortex/AlphaCortexDeviceTest.kt` - local-only
@@ -60,20 +80,22 @@
 - `docs/test-evidence/2026-08-09-alpha-recall-failure-before.png` - visible reproduced failure.
 - `docs/test-evidence/2026-08-09-alpha-native-cortex-settings-final.png` - final installed Alpha
   Settings with selected vault, Markdown counts, and recall receipts.
+- `docs/test-evidence/2026-08-09-alpha-broad-recall-failure.png` - exact user-visible failure for the
+  production broad-recall prompt.
 - `ECHO_BRIEF.md` and `ECHO_HANDOFF.md` - corrected architecture, evidence, limitations, and next work.
 
 ### Commands and evidence
 
-- `gradlew.bat --no-daemon testAlphaUnitTest assembleAlpha` passed after the final selector changes:
-  28 Alpha unit tests, zero failures.
+- `gradlew.bat --no-daemon testAlphaUnitTest assembleAlpha assembleAlphaAndroidTest` passed after
+  the broad-recall changes: 30 Alpha unit tests, zero failures.
 - `gradlew.bat --no-daemon testDebugUnitTest assembleDebug` passed: shared Main chat code and the
   protected no-op Cortex binding still compile and pass their existing tests.
 - Final `app-alpha.apk` update-install returned `Success` without clearing app data. The encrypted
   OpenAI credential preference and selected-vault preference remained present.
 - Manual instrumentation on phone `R5CX31PBW7V` passed `AlphaCortexDeviceTest` 1/1. It used a
   disposable cache-rooted context, captured exact Billy/Jarvis Markdown, recalled Greenwood from a
-  different session, wrote a verified retrieval receipt, and reopened the migrated index. Only the
-  test-runner package was uninstalled afterward.
+  different session through both direct location and exact `Hey Echo` broad recall, wrote verified
+  retrieval receipts, and reopened the migrated index. Only the test-runner package was uninstalled.
 - The final installed app cold-launched with no `AndroidRuntime` crash. The user-visible Settings
   screenshot shows `Sync/Billy Cortex`, 11 verified exchanges, 22 turn files, and 3 recall receipts.
 - The first pre-final cloud selector was too broad: receipt
@@ -96,8 +118,8 @@
   synthesis review, outcome learning, empathy/policy/routine modules, deletion/undo, and governance
   remain unimplemented.
 - Current semantic question-to-answer links cover explicit location and project intents only. Other
-  concepts use exact lexical evidence; a bounded recent fallback runs only for an explicit broad
-  recall request.
+  concepts use exact lexical evidence; explicit broad recall uses deterministic durable-statement
+  typing until the native semantic-record layer exists.
 - No embeddings, HipoRAG/LiteRAG/RAPTOR layers, Matryoshka vectors, summarization hierarchy, or
   second-model encoder exists yet.
 - No user-facing cloud-memory consent/preview control exists yet.

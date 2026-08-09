@@ -89,14 +89,14 @@ class CortexRecallEngineTest {
   }
 
   @Test
-  fun select_explicitBroadRecall_usesBoundedRecentBillyTurns() {
+  fun select_explicitBroadRecall_usesBoundedDurableBillyTurns() {
     val candidates =
       (1..8).map { number ->
         candidate(
           "memory-$number",
           CortexSourceKind.USER_STATED,
           (10 - number).toLong(),
-          "Personal detail $number.",
+          "I prefer personal detail $number.",
         )
       }
 
@@ -109,6 +109,77 @@ class CortexRecallEngineTest {
       )
 
     assertEquals(4, selected.size)
+  }
+
+  @Test
+  fun select_realBroadRecall_ignoresPriorEchoQuestionAndFindsStructuredInterview() {
+    val candidates =
+      listOf(
+        candidate(
+          "prior-recall-question",
+          CortexSourceKind.USER_STATED,
+          600,
+          "Hey Echo what do you remember about me",
+        ),
+        candidate(
+          "validation-command",
+          CortexSourceKind.USER_STATED,
+          500,
+          "Reply with exactly Alpha live OpenAI works.",
+        ),
+        candidate(
+          "reminder-command",
+          CortexSourceKind.USER_STATED,
+          400,
+          "Set a daily reminder at 9am.",
+        ),
+        candidate(
+          "interview",
+          CortexSourceKind.USER_STATED,
+          200,
+          "1.Billy\n2.Greenwood Delaware\n3.Jarvis app (think Codex on phone)\n" +
+            "4.Infinite Workshop\n5.Consciousness, simulation theory, and AI",
+        ),
+      )
+
+    val selected =
+      CortexRecallEngine.select(
+        candidatesNewestFirst = candidates,
+        query = "Hey Echo what do you remember about me",
+        maxArtifacts = 12,
+        maxContextChars = 6_000,
+      )
+
+    assertEquals(listOf("interview"), selected.map { it.candidate.artifactId })
+    assertTrue(selected.single().candidate.exactContent.contains("Greenwood Delaware"))
+    assertTrue(selected.single().whySurfaced.contains("explicit broad recall"))
+  }
+
+  @Test
+  fun select_broadRecallWithNoDurableStatements_returnsNoPacket() {
+    val selected =
+      CortexRecallEngine.select(
+        candidatesNewestFirst =
+          listOf(
+            candidate(
+              "prior-question",
+              CortexSourceKind.USER_STATED,
+              300,
+              "Hey Echo what do you remember about me",
+            ),
+            candidate(
+              "command",
+              CortexSourceKind.USER_STATED,
+              200,
+              "Reply with a test phrase.",
+            ),
+          ),
+        query = "What do you remember about me?",
+        maxArtifacts = 12,
+        maxContextChars = 6_000,
+      )
+
+    assertTrue(selected.isEmpty())
   }
 
   @Test

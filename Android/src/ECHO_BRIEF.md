@@ -12,6 +12,13 @@ instruction path without changing the visible user message. Conservative retriev
 answer-bearing `USER_STATED` records, keeps `OTHER_AGENT` wording non-authoritative, and follows
 adjacent question-to-answer links only for explicit location and project cues.
 
+Explicit broad recall such as “Hey Echo, what do you remember about me?” is a separate route. It
+bypasses ordinary word overlap so a prior copy of the same recall question cannot win. The route
+selects only durable Billy statements: structured interview answers or statements with identity,
+location, preference, project, goal, or belief cues. Questions, test prompts, reminders, and other
+commands are excluded. If no durable statement is available, the route returns no packet rather
+than parroting a previous question.
+
 This is not a complete native port of ThreadKeeper 2.99. Semantic records, durable checkpoints and
 open loops, typed graph links/routes, activation/gravity, dynamic memory resolution, synthesis
 review, outcome learning, empathy/policy/routine modules, deletion/undo, and governance remain to be
@@ -42,9 +49,8 @@ Android Jarvis now gives OpenAI cloud models the same installed Skill/MCP execut
 - Retrieval follows ThreadKeeper's smallest-useful-context rule. Direct `USER_STATED` evidence is
   preferred; a prior recall question is lower priority than an answer-bearing statement; and
   `OTHER_AGENT` content is surfaced only when Billy explicitly asks about prior Jarvis wording.
-- An unrelated query with no direct or linked match receives no memory packet. The bounded recent
-  fallback is allowed only when Billy explicitly asks for broad recall, such as “What do you
-  remember about me?”
+- An unrelated query with no direct or linked match receives no memory packet. Explicit broad recall
+  uses a separately scored durable-profile route rather than a generic recent-turn fallback.
 - Adjacent-turn question-to-answer traversal is currently limited to explicit `location` and
   `project` cues. Ambiguous wording such as “Alpha live test” must not activate a location link.
 - A successful nonempty recall writes a schema-11 Markdown retrieval receipt and indexes only the

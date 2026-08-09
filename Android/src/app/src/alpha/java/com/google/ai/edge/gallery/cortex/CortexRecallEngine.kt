@@ -69,6 +69,7 @@ internal object CortexRecallEngine {
     maxContextChars: Int,
   ): List<SelectedRecallArtifact> {
     if (maxArtifacts <= 0 || maxContextChars <= 0) return emptyList()
+    val broadRecall = asksForBroadRecall(query)
     val queryTokens = tokens(query)
     val scored =
       candidatesNewestFirst.mapIndexed { recencyIndex, candidate ->
@@ -91,9 +92,13 @@ internal object CortexRecallEngine {
           )
         }
     val lexical =
-      rankedLexical.firstOrNull { artifact ->
-        !looksLikeQuestion(artifact.candidate.exactContent)
-      }?.let { artifact -> listOf(artifact) } ?: rankedLexical.take(1)
+      if (broadRecall) {
+        emptyList()
+      } else {
+        rankedLexical.firstOrNull { artifact ->
+          !looksLikeQuestion(artifact.candidate.exactContent)
+        }?.let { artifact -> listOf(artifact) } ?: rankedLexical.take(1)
+      }
     val linkedBilly =
       scored
         .filter { (candidate, overlap, _) ->
@@ -122,16 +127,27 @@ internal object CortexRecallEngine {
         }
         .distinctBy { it.candidate.artifactId }
         .take(1)
-    val recentBilly =
-      candidatesNewestFirst
-        .filter { it.sourceKind == CortexSourceKind.USER_STATED }
-        .take(4)
-        .map { candidate ->
-          SelectedRecallArtifact(candidate = candidate, whySurfaced = "recent verified Billy turn")
-        }
-    val fallbackBilly =
-      if (lexical.isEmpty() && linkedBilly.isEmpty() && asksForBroadRecall(query)) recentBilly
-      else emptyList()
+    val broadBilly =
+      if (broadRecall) {
+        candidatesNewestFirst
+          .mapIndexedNotNull { recencyIndex, candidate ->
+            if (candidate.sourceKind != CortexSourceKind.USER_STATED) return@mapIndexedNotNull null
+            val durableScore = durablePersonalScore(candidate.exactContent)
+            if (durableScore <= 0) return@mapIndexedNotNull null
+            val recency = (candidatesNewestFirst.size - recencyIndex).coerceAtLeast(0)
+            Triple(candidate, durableScore + recency, durableScore)
+          }
+          .sortedByDescending { (_, score, _) -> score }
+          .take(4)
+          .map { (candidate, _, durableScore) ->
+            SelectedRecallArtifact(
+              candidate = candidate,
+              whySurfaced = "explicit broad recall: durable personal statement ($durableScore)",
+            )
+          }
+      } else {
+        emptyList()
+      }
     val asksForPriorJarvisWording = asksForPriorJarvisWording(query)
     val relevantJarvis =
       if (asksForPriorJarvisWording) {
@@ -153,7 +169,9 @@ internal object CortexRecallEngine {
 
     val selected = mutableListOf<SelectedRecallArtifact>()
     var usedChars = 0
-    for (artifact in lexical + linkedBilly + fallbackBilly + relevantJarvis) {
+    val routedArtifacts =
+      if (broadRecall) broadBilly else lexical + linkedBilly + relevantJarvis
+    for (artifact in routedArtifacts) {
       if (selected.any { it.candidate.artifactId == artifact.candidate.artifactId }) continue
       val estimatedChars = artifact.candidate.exactContent.length + 240
       if (usedChars + estimatedChars > maxContextChars) continue
@@ -228,12 +246,60 @@ internal object CortexRecallEngine {
   private fun looksLikeQuestion(content: String): Boolean {
     val trimmed = content.trim()
     if (trimmed.endsWith("?")) return true
+    val withoutAddress =
+      trimmed.replaceFirst(
+        Regex("^(hey\\s+)?(echo|jarvis)[,!?:;\\s]+", RegexOption.IGNORE_CASE),
+        "",
+      )
     return Regex(
         "^(what|where|when|who|why|how|do|does|did|can|could|would|will|is|are|am|" +
           "have|has|remember)\\b",
         RegexOption.IGNORE_CASE,
       )
-      .containsMatchIn(trimmed)
+      .containsMatchIn(withoutAddress)
+  }
+
+  private fun durablePersonalScore(content: String): Int {
+    val trimmed = content.trim()
+    if (trimmed.isBlank() || asksForBroadRecall(trimmed)) return 0
+    if (looksLikeQuestion(trimmed) || looksLikeCommandOrRequest(trimmed)) return 0
+
+    val numberedAnswers = Regex("(?m)^\\s*\\d+\\s*[.)]").findAll(trimmed).count()
+    val durableCues =
+      listOf(
+          Regex("\\b(my name is|call me|i am called|i'm called)\\b", RegexOption.IGNORE_CASE),
+          Regex("\\b(i live|i'm from|i am from|my home|based in)\\b", RegexOption.IGNORE_CASE),
+          Regex(
+            "\\b(i like|i love|i prefer|my favorite|i dislike|i hate)\\b",
+            RegexOption.IGNORE_CASE,
+          ),
+          Regex(
+            "\\b((i am|i'm|we are|we're) (building|making|working|designing|creating)|" +
+              "my project)\\b",
+            RegexOption.IGNORE_CASE,
+          ),
+          Regex(
+            "\\b(i want|i need|i care about|i believe|my goal is|my goals are)\\b",
+            RegexOption.IGNORE_CASE,
+          ),
+        )
+        .count { cue -> cue.containsMatchIn(trimmed) }
+    val structuredScore = if (numberedAnswers >= 2) 400 + numberedAnswers * 40 else 0
+    return structuredScore + durableCues * 160
+  }
+
+  private fun looksLikeCommandOrRequest(content: String): Boolean {
+    val withoutAddress =
+      content.trim().replaceFirst(
+        Regex("^(hey\\s+)?(echo|jarvis)[,!?:;\\s]+", RegexOption.IGNORE_CASE),
+        "",
+      )
+    return Regex(
+        "^(ask|reply|set|schedule|create|write|explain|tell|show|give|run|test|" +
+          "remember|forget|delete|find|look up|search)\\b",
+        RegexOption.IGNORE_CASE,
+      )
+      .containsMatchIn(withoutAddress)
   }
 
   private fun asksForBroadRecall(query: String): Boolean =

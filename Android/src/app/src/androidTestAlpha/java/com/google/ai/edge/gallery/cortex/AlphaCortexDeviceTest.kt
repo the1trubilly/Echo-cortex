@@ -82,16 +82,28 @@ class AlphaCortexDeviceTest {
     assertTrue(recall.message, recall.verified)
     assertTrue(recall.contextForModel.contains("Greenwood, Delaware"))
     assertEquals(1, recall.artifactIds.size)
+    val broadRecall =
+      runtime.recall(
+        CortexRecallRequest(
+          query = "Hey Echo what do you remember about me",
+          currentSessionId = "device-test-new-session",
+        )
+      )
+    assertTrue(broadRecall.message, broadRecall.verified)
+    assertTrue(broadRecall.contextForModel.contains("Greenwood, Delaware"))
+    assertEquals(1, broadRecall.artifactIds.size)
     val retrievalFiles =
       retrievalDirectory.listFiles().orEmpty().filter { file -> file.name !in retrievalNamesBefore }
-    assertEquals(1, retrievalFiles.size)
-    assertTrue("document_type: memory_cycle_retrieval_receipt" in retrievalFiles.single().readText())
-    assertTrue("verified: true" in retrievalFiles.single().readText())
+    assertEquals(2, retrievalFiles.size)
+    retrievalFiles.forEach { file ->
+      assertTrue("document_type: memory_cycle_retrieval_receipt" in file.readText())
+      assertTrue("verified: true" in file.readText())
+    }
 
     val after = runtime.status.value
     assertEquals(before.verifiedExchanges + 1, after.verifiedExchanges)
     assertEquals(before.verifiedArtifacts + 2, after.verifiedArtifacts)
-    assertEquals(before.verifiedRecalls + 1, after.verifiedRecalls)
+    assertEquals(before.verifiedRecalls + 2, after.verifiedRecalls)
     val reopenedIndex = CortexIndexDatabase(context)
     try {
       assertEquals(after.verifiedExchanges, reopenedIndex.counts().exchanges)
