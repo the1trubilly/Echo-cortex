@@ -8,6 +8,9 @@ exact completed turn and Jarvis's exact completed reply as distinct, hash-verifi
 artifacts, writes a receipt last, and maintains a rebuildable SQLite index. The canonical vault
 defaults to Alpha-private storage and can be changed in Settings to an Obsidian-compatible Android
 folder. Main remains installed, operational, and unable to execute the experimental Cortex writer.
+The real-device acceptance pass now also confirms a cold-launched OpenAI turn, exact two-sided
+Markdown capture into Billy's selected `Sync/Billy Cortex` folder, encrypted-key persistence, and
+visible Settings counts.
 
 ## Prior milestone: OpenAI cloud Skill/MCP execution
 
@@ -55,6 +58,9 @@ Android Jarvis now gives OpenAI cloud models the same installed Skill/MCP execut
 - For `store: false` OpenAI tool turns, preserve and resend every returned Responses output item, including reasoning, message, and function-call items. Append a `function_call_output` with the matching `call_id` after each confirmed dispatch result.
 - Adapt the existing LiteRT tool descriptions into flattened OpenAI Responses function tools. Keep `strict: false` until every inherited schema satisfies OpenAI strict-mode requirements, and set `parallel_tool_calls: false` so Android permission prompts and WebView skill execution remain ordered.
 - Bound a cloud turn to 12 model/tool rounds. Roll back every item added by a failed or cancelled turn so partial tool conversations do not poison later context.
+- OpenAI session setup must not depend on whether a credential already exists at initialization time.
+  Settings may add or replace the encrypted key after the chat screen is alive; every turn reads the
+  latest saved value and reports a specific missing-key error only when execution actually begins.
 - Store the OpenAI API key separately from protobuf settings. Encrypt it with an Android Keystore AES/GCM key, keep only ciphertext and IV in private preferences, and exclude those preferences from both cloud backup and device transfer.
 - Treat a nonblank API-key draft as pending credential input: Save/Replace, keyboard Done, Close, and system Back must all use the same verified save path. If encryption or persistence fails, keep Settings open and show an error instead of reporting success.
 - Never print, log, commit, or place an OpenAI API key in a Gradle property, resource, manifest, or source file.
@@ -104,6 +110,10 @@ Android Jarvis now gives OpenAI cloud models the same installed Skill/MCP execut
   independent settings and compiled in the existing task/system/personality order.
 - Association, retrieval, and future gravity scores may affect navigation but must never rewrite
   source truth, provenance, or confidence.
+- Device acceptance is not complete from build, logs, or filesystem checks alone. Every changed user
+  journey must include screenshots of the state a user actually sees, followed by verification of the
+  corresponding side effect. Ask Billy when a required credential, permission, picker choice, or
+  ambiguous destructive decision cannot be supplied safely by the test harness.
 
 - System Instructions and Personality Prompt must remain independently editable and independently stored.
 - Both settings must persist across app process death and reopening.

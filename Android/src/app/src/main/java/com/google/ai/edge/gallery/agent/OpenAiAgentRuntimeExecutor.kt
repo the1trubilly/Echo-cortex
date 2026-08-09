@@ -51,11 +51,9 @@ constructor(
     config: AgentRuntimeConfig,
     onDone: (String) -> Unit,
   ) {
-    if (!credentialsRepository.hasApiKey()) {
-      onDone("Add an OpenAI API key in Settings before using OpenAI models.")
-      return
-    }
-
+    // Configure the cloud session even when a key has not been saved yet. The user can add or
+    // replace a credential from Settings while this chat screen remains alive; execution reads the
+    // latest encrypted value for every turn and reports a specific missing-key error when needed.
     model = config.model
     systemInstruction = config.systemInstruction.orEmpty()
     toolExecutionContext =

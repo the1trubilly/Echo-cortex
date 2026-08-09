@@ -23,6 +23,11 @@
   writes a verified receipt, and never reads Main's WebView database automatically.
 - Preserved the existing separate System Instructions and Personality Prompt editors and their
   task/system/personality composition order in Alpha.
+- Fixed the OpenAI lifecycle gap exposed by the first real Alpha walkthrough: cloud-session
+  configuration no longer returns early when Settings has no key yet. A key saved later is read on
+  the next turn without requiring the user to restart or reselect the model.
+- Added screenshot-based acceptance evidence for the user-visible key state, successful cold-launch
+  OpenAI reply, and selected-vault memory counts.
 
 ### Exact files changed
 
@@ -53,6 +58,14 @@
 - `app/src/testAlpha/.../CortexMarkdownCodecTest.kt` - exact UTF-8 and schema-11 validation tests.
 - `app/src/androidTestAlpha/.../AlphaCortexDeviceTest.kt` - real-device exact pair, receipt, and SQLite
   reopen verification in disposable cache rather than Billy's vault.
+- `app/src/main/java/com/google/ai/edge/gallery/agent/OpenAiAgentRuntimeExecutor.kt` - always prepares
+  the cloud session before a key exists while continuing to read the latest encrypted key per turn.
+- `app/src/androidTestAlpha/.../OpenAiInitializationDeviceTest.kt` - regression coverage for entering
+  Settings without a key and adding the credential afterward.
+- `docs/test-evidence/2026-08-09-alpha-live-openai.png` - visible successful live provider reply.
+- `docs/test-evidence/2026-08-09-alpha-settings-key.png` - visible `API key saved` state without key
+  material.
+- `docs/test-evidence/2026-08-09-alpha-cortex-vault.png` - visible selected vault and verified counts.
 - `ECHO_BRIEF.md` and `ECHO_HANDOFF.md` - record the boundary, decisions, evidence, and remaining work.
 
 ### Commands and evidence
@@ -78,15 +91,23 @@
 - Visible Alpha Settings showed `App version: 1.0.17-alpha (38)`, Personality Prompt,
   `Cortex / ThreadKeeper vault (Alpha)`, the private vault label, zero real-vault counts, folder
   selection, and schema-11 import controls.
+- Reproduced the real failure in a screenshot: a saved Alpha key followed by a chat turn displayed
+  `OpenAI is not initialized.` Logs confirmed this occurred before an OpenAI HTTP response.
+- Final clean command `gradlew.bat testDebugUnitTest testAlphaUnitTest assembleAlpha
+  assembleAlphaAndroidTest` returned `BUILD SUCCESSFUL`; the two intended device tests then passed
+  2/2 through a manual instrumentation install that preserved Alpha app data.
+- A final cold launch visibly showed `API key saved`; the live prompt `Reply with exactly Alpha live
+  test passed` received `Alpha live test passed` in 2.3 seconds.
+- Alpha wrote the exact prompt and exact Jarvis reply as separate Markdown documents plus a verified
+  receipt under the selected `Sync/Billy Cortex/Jarvis Alpha Cortex` tree. Settings visibly reported
+  `1 verified exchanges · 2 turn files · 0 imports` after restart.
+- One automated coordinate initially selected the `Schedule Reminder` sample because screenshot and
+  device-coordinate resolutions differed. The exact accidental 9:00 AM reminder, alarm, three vault
+  documents, and index row were identified and removed. The cleanup refused to act until artifact
+  contents matched; the selected vault now contains only the labeled successful test exchange.
 
 ### Not yet verified or implemented
 
-- A live cloud-model exchange was not run in Alpha because its correctly isolated data contains no
-  OpenAI API key. The post-turn hook compiles and the native persistence path is device-tested, but
-  end-to-end capture from a real provider reply remains to be confirmed after Billy enters an Alpha key.
-- A user-selected Storage Access Framework folder was not chosen on Billy's behalf. The chooser is
-  visible and the provider write path is implemented, but only Alpha-private atomic writes were
-  exercised by the automated device test.
 - No actual ThreadKeeper database export was supplied; only the 2.99 implementation ZIP was supplied.
   Import validation is unit-tested, but no user memory was imported.
 - Retrieval, linking, summarization, graph gravity, embeddings, Matryoshka vector levels of detail,
@@ -105,10 +126,10 @@
 
 ### Recommended next step
 
-Enter an OpenAI key in Alpha only, send one harmless labeled test exchange, verify the two resulting
-Markdown files and receipt in the private vault, force-stop/relaunch Alpha, and verify the counts and
-files persist. Then implement the provider-neutral pre-turn retrieval gate over the native Markdown
-and SQLite boundary before adding vector or graph-derived indexes.
+Implement the provider-neutral pre-turn retrieval gate over the native Markdown and SQLite boundary,
+with screenshot-based user-flow acceptance and exact-vault verification before adding vector or
+graph-derived indexes. Import an actual ThreadKeeper schema-11 database copy only when Billy supplies
+one and explicitly selects it in Alpha.
 
 ## Prior milestone: OpenAI cloud Skill/MCP execution
 
