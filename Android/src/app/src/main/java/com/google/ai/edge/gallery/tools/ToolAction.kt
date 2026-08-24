@@ -26,6 +26,7 @@ enum class ToolActionName() {
   ASK_INFO,
   REQUEST_PERMISSION,
   ASK_MCP_TOOL_CALL_PERMISSION,
+  ASK_SENSITIVE_TOOL_CALL_PERMISSION,
 }
 
 /**
@@ -116,6 +117,16 @@ class AskMcpToolCallPermissionAction(
   val argument: String,
   val result: CompletableDeferred<PermissionResult> = CompletableDeferred(),
 ) : ToolAction(name = ToolActionName.ASK_MCP_TOOL_CALL_PERMISSION)
+
+/**
+ * Emitted before a high-authority native capability such as Termux or ADB can run. Unlike MCP
+ * permissions, sensitive native capabilities deliberately support one-time approval only.
+ */
+class AskSensitiveToolCallPermissionAction(
+  val toolName: String,
+  val command: String,
+  val result: CompletableDeferred<PermissionResult> = CompletableDeferred(),
+) : ToolAction(name = ToolActionName.ASK_SENSITIVE_TOOL_CALL_PERMISSION)
 
 /**
  * Parsed JSON data returned from a JavaScript skill execution (`[CallJsToolAction]`).

@@ -1,6 +1,27 @@
 # Android Jarvis — Echo Brief
 
-## Current milestone: native ThreadKeeper memory-cycle retrieval
+## Current milestone: recoverable, permission-gated wireless self-ADB
+
+Jarvis now treats wireless ADB as a recoverable native capability rather than a one-time setup task.
+After the user approves an ADB device command under the selected terminal safety mode, the native
+tool checks Termux's ADB server for a connection whose `ro.build.fingerprint` exactly matches the
+phone running Jarvis. If none exists, Jarvis posts a private direct-reply notification, opens Android
+Wireless debugging through the platform quick-settings route, and waits while the user chooses Pair
+device with pairing code and enters the temporary six digits through the notification. If a vendor
+does not expose a direct route, Jarvis falls back to Developer options focused on Wireless debugging.
+Android's native `NsdManager` discovers this phone's local `_adb-tls-pairing` and
+`_adb-tls-connect` endpoints,
+Termux pairs/reconnects, native code verifies the fingerprint, and the tool resumes the originally
+approved command against the verified serial. Discovery does not depend on optional Termux `ip` or
+`adb mdns` support.
+
+The model never receives the pairing code and cannot supply ADB target selectors or invoke transport
+pair/connect/disconnect commands directly. Android still requires the phone owner to enable Wireless
+debugging and explicitly reveal a temporary pairing code; Jarvis does not bypass that platform
+consent boundary. Commands continue to run inside the persistent Termux tmux session
+`android-jarvis`, using either approve-every-command or approve-dangerous-only mode.
+
+## Prior milestone: native ThreadKeeper memory-cycle retrieval
 
 Jarvis Alpha now has the first native Kotlin ThreadKeeper memory-cycle slice at the app level, not
 as a model-selected skill. Every completed Agent Chat exchange still stores Billy's exact turn and
@@ -31,6 +52,27 @@ implemented. Main remains protected by the no-op Cortex binding.
 Android Jarvis now gives OpenAI cloud models the same installed Skill/MCP execution bridge as local agent models. The OpenAI Responses loop sends the existing tool inventory, preserves model output items, executes function calls sequentially through Android Jarvis's permission-aware dispatcher, returns each confirmed tool result to the model, and continues until the model answers. The built-in `jarvis-system-core` skill remains stateless, while the default agent behavior now retrieves and records continuity automatically when an enabled memory skill is available.
 
 ## Permanent architecture decisions
+
+- ADB device commands must resolve through a native self-ADB connection provider after command
+  approval and before execution. Host-only inspection commands such as `adb devices -l` do not pair.
+- Jarvis may target only a connected serial whose Android build fingerprint equals the runtime
+  phone's `Build.FINGERPRINT`. Model-supplied `-s`, `-d`, `-e`, host/port selectors, and direct
+  pair/connect/disconnect/server-control requests are rejected.
+- Wireless-debugging pairing remains explicit user consent. Jarvis should open Wireless debugging
+  directly using Android's standard action or the platform's Wireless-debugging quick-tile route,
+  with focused Developer options as the compatibility fallback. It may collect the temporary
+  six-digit code through a private notification reply, but may not bypass the Android pairing screen
+  or store/expose the code to the model, chat, Cortex, source, or logs.
+- A successfully paired or already connected device command resumes automatically; the user should
+  not have to repeat the original request after completing pairing.
+- In `DANGEROUS_COMMANDS_ONLY` mode, every ADB shell/device command remains approval-gated. Only the
+  narrow deterministic host-side read-only ADB allowlist may run without a prompt; no approval is
+  remembered between commands.
+- Use Android `NsdManager` for local ADB TLS service discovery and compare resolved IPv4 addresses
+  with addresses assigned to this phone's Android networks. Do not assume Termux includes `ip` or
+  that its packaged ADB client implements the `mdns services` host command.
+- Declare and request Android 17's `ACCESS_LOCAL_NETWORK` permission only where the runtime requires
+  it; Android 16 continues to use framework NSD under its current local-network rules.
 
 - Main is the protected known-good application. Experimental Cortex work must run in the separate
   `com.google.aiedge.gallery.alpha` application and must never be promoted automatically.

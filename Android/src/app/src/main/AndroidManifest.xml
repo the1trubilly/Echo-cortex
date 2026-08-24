@@ -36,7 +36,13 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <uses-permission android:name="com.google.android.apps.aicore.service.BIND_SERVICE" />
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
+
+    <queries>
+        <package android:name="com.termux" />
+    </queries>
 
     <!-- Additional permission required for push notification handling -->
     <!-- Required for resurfacing notifications after boot -->
@@ -126,6 +132,10 @@
             tools:node="merge">
         </service>
 
+        <service
+            android:name="com.google.ai.edge.gallery.tools.TermuxCommandResultService"
+            android:exported="false" />
+
         <!-- For Firebase Analytics. -->
         <receiver
             android:name="com.google.android.gms.measurement.AppMeasurementReceiver"
@@ -150,6 +160,10 @@
 
         <receiver
             android:name="com.google.ai.edge.gallery.notifications.NotificationReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name="com.google.ai.edge.gallery.tools.SelfAdbPairingReceiver"
             android:exported="false" />
 
         <receiver

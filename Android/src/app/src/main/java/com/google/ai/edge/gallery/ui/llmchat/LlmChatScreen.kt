@@ -232,7 +232,12 @@ fun ChatViewWrapper(
   cleanupModelsOnNavigateUp: Boolean = true,
 ) {
   val context = LocalContext.current
-  val task = modelManagerViewModel.getTaskById(id = taskId)!!
+  // Jarvis is now the start destination and can compose before the asynchronous task list has
+  // populated ModelManagerUiState. The injected custom task is already available at that point.
+  val task =
+    modelManagerViewModel.getTaskById(id = taskId)
+      ?: modelManagerViewModel.getCustomTaskByTaskId(id = taskId)?.task
+      ?: return
   val scope = rememberCoroutineScope()
 
   ChatView(

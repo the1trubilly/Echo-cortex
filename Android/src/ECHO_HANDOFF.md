@@ -1,6 +1,104 @@
 # Android Jarvis — Echo Handoff
 
-## Current milestone: native Cortex cross-session recall
+## Current milestone: recoverable, permission-gated wireless self-ADB
+
+### Scope implemented so far
+
+- Added a native self-ADB connection provider used automatically by device-targeting `runAdb`
+  calls after the exact command has passed the user's approval policy.
+- Added Android-native NSD discovery for this phone's pairing/connect endpoints, six-digit
+  validation, Termux `adb pair`/`adb connect`, and exact Android build-fingerprint verification.
+- Added a private high-priority notification with direct reply for the temporary pairing code and
+  a direct Wireless-debugging handoff, allowing the code to be entered while Android Settings stays
+  open. The route order is the public Wireless-debugging action, Android's Wireless-debugging
+  quick-tile preferences action, then Developer options focused on the Wireless-debugging row.
+- Added a manual `Connect Jarvis to this phone` entry in Terminal & ADB settings; ordinary approved
+  ADB device actions invoke the same recovery flow automatically when disconnected.
+- Restricted device actions to the verified phone. Direct transport management and model-supplied
+  target selectors are rejected before command execution.
+- Updated the runtime self-model so Jarvis understands that it can recover its own ADB connection
+  with user assistance and that native code, not the model, handles the pairing code.
+
+### Files changed for this slice
+
+- `app/src/main/java/com/google/ai/edge/gallery/tools/SelfAdbPairing.kt` - connection provider,
+  Android NSD endpoint discovery, pair/connect flow, fingerprint verification, and request registry.
+- `app/src/main/java/com/google/ai/edge/gallery/tools/SelfAdbPairingNotification.kt` - private direct-
+  reply pairing prompt and receiver.
+- `app/src/main/java/com/google/ai/edge/gallery/tools/TermuxTerminalTool.kt` - automatic self-ADB gate,
+  verified serial targeting, and target/transport restrictions.
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/TermuxSetupBottomSheet.kt` -
+  manual connection entry and notification-permission handoff.
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/JarvisRuntimeSelfModel.kt` -
+  truthful self-ADB capability and limits.
+- `app/src/main/java/com/google/ai/edge/gallery/ui/llmchat/LlmChatScreen.kt` - fixes the cold-start
+  race where Jarvis composed before the asynchronous task list and crashed on a forced null task.
+- `app/src/main/AndroidManifest.xml` - non-exported pairing-reply receiver.
+- `app/src/main/res/values/strings.xml` - self-ADB setup, prompt, progress, and result copy.
+- `app/src/test/java/com/google/ai/edge/gallery/tools/SelfAdbPairingTest.kt` - endpoint, validation,
+  pairing, and fingerprint regressions.
+- `app/src/test/java/com/google/ai/edge/gallery/tools/TermuxTerminalToolTest.kt` - automatic targeting
+  and model-supplied target rejection regressions.
+- `app/src/test/java/com/google/ai/edge/gallery/customtasks/agentchat/JarvisRuntimeSelfModelTest.kt` -
+  self-knowledge regression.
+- `ECHO_BRIEF.md` and `ECHO_HANDOFF.md` - architecture and current evidence.
+- `docs/test-evidence/2026-08-24-self-adb-alpha-unlocked.png` - final unlocked Jarvis home.
+- `docs/test-evidence/2026-08-24-self-adb-ready.png` - Terminal & ADB self-connection controls.
+- `docs/test-evidence/2026-08-24-self-adb-direct-wireless-debugging.png` - direct Settings destination
+  with Pair device with pairing code visible.
+- `docs/test-evidence/2026-08-24-self-adb-chat-proof.png` - live transcript showing ADB via Termux
+  finished and Jarvis's confirmed result.
+- `docs/test-evidence/2026-08-24-self-adb-model-read.png` - second live ADB transcript confirming
+  Jarvis read this phone's model through the same verified path.
+
+### Current evidence
+
+- `gradlew.bat --no-daemon compileAlphaKotlin compileAlphaUnitTestKotlin` returned
+  `BUILD SUCCESSFUL`.
+- Final `gradlew.bat --no-daemon testAlphaUnitTest assembleAlpha assembleAlphaAndroidTest` returned
+  `BUILD SUCCESSFUL` in 49 seconds across 101 tasks: 46 unit tests, zero failures, including four
+  self-ADB engine tests and eight terminal-tool tests.
+- The final `app-alpha.apk` update-install returned `Success` without clearing Alpha data.
+- The first post-install screenshot was black because Alpha crashed at `LlmChatScreen.kt:235` while
+  the Jarvis start destination raced the asynchronous model-manager task list. The task now falls
+  back to the already injected custom task. After rebuild, the crash buffer remained empty and the
+  Alpha process/activity stayed alive; the screen was still black because Samsung reported secure
+  keyguard showing and the display off.
+- A first real Termux discovery test correctly failed: Termux has no `ip` utility and its ADB 1.0.41
+  reports `unknown host service 'mdns:services'`. Production discovery was replaced with Android
+  `NsdManager`; the revised on-phone test found this Galaxy's own wireless-debugging connect endpoint
+  and passed 1/1 in 3.902 seconds.
+- Billy completed the actual six-digit notification-reply flow and reported that Jarvis paired
+  successfully. Returning to Terminal & ADB showed `Jarvis verified a wireless ADB connection to
+  this phone`, which is emitted only after exact `Build.FINGERPRINT` verification.
+- A live user-level request, `Use ADB to open Android Settings on this phone.`, completed in 9.6
+  seconds. Android Settings visibly opened, and the returned chat transcript displayed `ADB via
+  Termux finished` followed by `Opened Android Settings on this phone.`
+- The saved terminal mode was read back from Alpha as `DANGEROUS_COMMANDS_ONLY`. A second live
+  request for `adb shell getprop ro.product.model` visibly stopped at `Run this command?`, showed
+  capability `ADB via Termux` and the exact command, and offered only `Run once` or `Don't allow`.
+  After the on-screen one-time approval, the transcript returned `SM-S928U`. This confirms the
+  device-changing ADB path did not bypass the configured approval gate.
+- Samsung does not resolve `android.settings.WIRELESS_DEBUGGING_SETTINGS`. Its exported
+  `android.service.quicksettings.action.QS_TILE_PREFERENCES` route with the Wireless-debugging tile
+  component was tested directly and visibly landed on `Wireless debugging` with `Pair device with
+  pairing code` already in view. The final installed build uses this route after trying the standard
+  action, leaving one user tap before Android reveals the temporary code.
+- Samsung's system `adbd` process recorded one destroyed-mutex SIGABRT while the wireless-debugging
+  port rotated during the first pairing attempt. The daemon restarted on a new port, pairing and the
+  live Jarvis command still completed, and the final direct screen showed Jarvis's localhost ADB
+  identity as currently connected. This was not an Alpha process crash.
+- The final installed Alpha process launched as PID 24101 with `MainActivity` focused. The crash
+  buffer contained no `com.google.aiedge.gallery.alpha` or `AndroidRuntime` entry.
+
+### Recommended next step
+
+Return to the native ThreadKeeper milestone: add atomic semantic Markdown records plus checkpoint and
+open-loop notes derived from exact source turns, then test automatic recall through a fresh real chat
+session. Self-ADB can now support future device-observation and screenshot loops, but every mutating
+command must remain behind the configured approval policy.
+
+## Prior milestone: native Cortex cross-session recall
 
 ### Follow-up: real broad-recall acceptance failure and fix
 

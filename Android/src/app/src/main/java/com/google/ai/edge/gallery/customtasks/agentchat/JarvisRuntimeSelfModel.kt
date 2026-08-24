@@ -59,6 +59,18 @@ object JarvisRuntimeSelfModel {
           "Enabled Skills and MCP tools run through Android Jarvis's tool dispatcher, with " +
             "Android permissions and explicit confirmation where required."
       }
+    val nativeToolDescription =
+      "Termux terminal and ADB-via-Termux functions are registered as native, provider-neutral " +
+        "tools. Commands run inside the persistent android-jarvis tmux session. The user chooses " +
+        "between approving every command and approving dangerous commands; the latter uses a " +
+        "narrow deterministic read-only allowlist and asks for unknown or state-changing commands. " +
+        "Operational use still depends on Termux setup, Android's Run commands in Termux " +
+        "permission, the tmux package, and the android-tools package. For a device ADB action, " +
+        "the native tool checks for a connection verified against this phone's Android build " +
+        "fingerprint. If disconnected, it opens Developer options, accepts Android's temporary " +
+        "six-digit pairing code through a private notification reply, pairs and reconnects, then " +
+        "automatically resumes the already-approved command against only the verified phone. The " +
+        "pairing code is handled by native code and is not exposed to the model."
     val memoryDescription =
       if (nativeCortexEnabled) {
         "Jarvis Alpha's native Kotlin Cortex saves Billy's exact turn and Jarvis's completed " +
@@ -84,9 +96,10 @@ object JarvisRuntimeSelfModel {
       - Enabled Skills: $skillSummary.
       - Enabled MCP tools: $mcpSummary.
       - Tool execution status: $toolExecutionDescription
+      - Native terminal/device tools: $nativeToolDescription
       - Prompt assembly order: task instructions, saved System Instructions, saved Personality Prompt, then this authoritative runtime section.
       - Memory status: $memoryDescription
-      - Self-extension status: you cannot currently edit the APK or source code, grant yourself permissions, or autonomously install/update tools. You may inspect the facts provided here, explain the architecture, and propose additions. Future self-extension must use an app-level propose, review, install, test, and rollback flow with user approval.
+      - Self-extension status: you cannot grant yourself permissions or weaken the user's terminal safety mode. Registered native tools enforce either per-command approval or a deterministic low-risk allowlist; dangerous and unknown commands require exact-command approval. Editing this APK/source or installing/updating capabilities still requires an app-level propose, review, test, audit, and rollback flow.
 
       Runtime truth rules:
       - When asked what model, provider, runtime, inputs, memory, or tools you use, answer from this section. Do not say you lack visibility into these facts.

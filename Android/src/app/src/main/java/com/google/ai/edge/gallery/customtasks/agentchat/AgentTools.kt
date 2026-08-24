@@ -25,6 +25,7 @@ import com.google.ai.edge.gallery.tools.LoadSkillTool
 import com.google.ai.edge.gallery.tools.RunIntentTool
 import com.google.ai.edge.gallery.tools.RunJsTool
 import com.google.ai.edge.gallery.tools.RunMcpTool
+import com.google.ai.edge.gallery.tools.TermuxTerminalTool
 import com.google.ai.edge.gallery.tools.ToolAction
 import com.google.ai.edge.gallery.tools.ToolDefinition
 import com.google.ai.edge.gallery.tools.ToolsProvider
@@ -77,8 +78,11 @@ open class AgentToolsImpl : AgentTools {
 
   val runIntentTool by lazy { RunIntentTool(context = context, skillsProvider = skillsProvider) }
 
+  val termuxTerminalTool by lazy { TermuxTerminalTool(context = context) }
+
   override fun getAvailableTools(): List<ToolDefinition> {
-    return listOf(loadSkillTool, runMcpTool, runJsTool, runIntentTool) + activeTools
+    return listOf(loadSkillTool, runMcpTool, runJsTool, runIntentTool, termuxTerminalTool) +
+      activeTools
   }
 
   override fun registerTool(tool: ToolDefinition) {

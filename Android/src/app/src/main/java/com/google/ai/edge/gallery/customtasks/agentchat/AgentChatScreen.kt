@@ -88,6 +88,7 @@ import com.google.ai.edge.gallery.firebaseAnalytics
 import com.google.ai.edge.gallery.skills.formatSelectedSkills
 import com.google.ai.edge.gallery.tools.AskInfoToolAction
 import com.google.ai.edge.gallery.tools.AskMcpToolCallPermissionAction
+import com.google.ai.edge.gallery.tools.AskSensitiveToolCallPermissionAction
 import com.google.ai.edge.gallery.tools.CallJsToolAction
 import com.google.ai.edge.gallery.tools.PermissionResult
 import com.google.ai.edge.gallery.tools.RequestPermissionToolAction
@@ -150,12 +151,16 @@ fun AgentChatScreen(
   var showMcpManagerBottomSheet by remember { mutableStateOf(false) }
   var showControlCenterBottomSheet by remember { mutableStateOf(false) }
   var showSettingsDialog by remember { mutableStateOf(false) }
+  var showTermuxSetupBottomSheet by remember { mutableStateOf(false) }
   var returnToControlCenterAfterSkills by remember { mutableStateOf(false) }
   var returnToControlCenterAfterMcp by remember { mutableStateOf(false) }
   var showAskInfoDialog by remember { mutableStateOf(false) }
   var currentAskInfoAction by remember { mutableStateOf<AskInfoToolAction?>(null) }
   var currentMcpPermissionAction by remember {
     mutableStateOf<AskMcpToolCallPermissionAction?>(null)
+  }
+  var currentSensitivePermissionAction by remember {
+    mutableStateOf<AskSensitiveToolCallPermissionAction?>(null)
   }
   var askInfoInputValue by remember { mutableStateOf("") }
   var webViewRef: WebView? by remember { mutableStateOf(null) }
@@ -466,6 +471,9 @@ fun AgentChatScreen(
             is AskMcpToolCallPermissionAction -> {
               currentMcpPermissionAction = action
             }
+            is AskSensitiveToolCallPermissionAction -> {
+              currentSensitivePermissionAction = action
+            }
           }
         }
       }
@@ -669,6 +677,18 @@ fun AgentChatScreen(
     )
   }
 
+  if (currentSensitivePermissionAction != null) {
+    val action = currentSensitivePermissionAction!!
+    SensitiveToolCallPermissionDialog(
+      toolName = action.toolName,
+      command = action.command,
+      onResult = { result ->
+        action.result.complete(result)
+        currentSensitivePermissionAction = null
+      },
+    )
+  }
+
   if (showControlCenterBottomSheet) {
     JarvisControlCenterBottomSheet(
       onDismiss = { showControlCenterBottomSheet = false },
@@ -686,6 +706,10 @@ fun AgentChatScreen(
         returnToControlCenterAfterMcp = true
         showMcpManagerBottomSheet = true
       },
+      onTerminalClick = {
+        showControlCenterBottomSheet = false
+        showTermuxSetupBottomSheet = true
+      },
       onModelsClick = {
         showControlCenterBottomSheet = false
         navigateUp()
@@ -701,6 +725,15 @@ fun AgentChatScreen(
         showSettingsDialog = false
         showControlCenterBottomSheet = true
       },
+    )
+  }
+
+  if (showTermuxSetupBottomSheet) {
+    TermuxSetupBottomSheet(
+      onDismiss = {
+        showTermuxSetupBottomSheet = false
+        showControlCenterBottomSheet = true
+      }
     )
   }
 

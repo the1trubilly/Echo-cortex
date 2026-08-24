@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Settings
@@ -56,6 +57,7 @@ fun JarvisControlCenterBottomSheet(
   onSettingsClick: () -> Unit,
   onSkillsClick: () -> Unit,
   onMcpClick: () -> Unit,
+  onTerminalClick: () -> Unit,
   onModelsClick: () -> Unit,
 ) {
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -114,6 +116,12 @@ fun JarvisControlCenterBottomSheet(
         title = stringResource(R.string.manage_mcp_servers),
         description = stringResource(R.string.jarvis_mcp_description),
         onClick = onMcpClick,
+      )
+      ControlCenterItem(
+        icon = Icons.Outlined.Terminal,
+        title = stringResource(R.string.termux_setup_title),
+        description = stringResource(R.string.jarvis_terminal_description),
+        onClick = onTerminalClick,
       )
       ControlCenterItem(
         icon = Icons.Outlined.Cloud,

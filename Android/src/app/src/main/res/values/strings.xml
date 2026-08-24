@@ -371,6 +371,11 @@
   <string name="mcp_tool_always_allow" translatable="true" description="Button label to grant permanent permission for the tool to run without asking again. [CHAR_LIMIT=14]">Always allow</string>
   <string name="mcp_tool_allow_once" translatable="true" description="Button label to grant one-time permission for the tool to run. [CHAR_LIMIT=12]">Allow once</string>
   <string name="mcp_tool_dont_allow" translatable="true" description="Button label to deny permission for the tool to run. [CHAR_LIMIT=13]">Don\'t allow</string>
+  <string name="sensitive_tool_permission_title" translatable="true">Run this command?</string>
+  <string name="sensitive_tool_permission_warning" translatable="true">Terminal and ADB commands can read data or change files, apps, and device state. Review the exact command before allowing it.</string>
+  <string name="sensitive_tool_name_label" translatable="true">Capability</string>
+  <string name="sensitive_tool_command_label" translatable="true">Exact command</string>
+  <string name="sensitive_tool_run_once" translatable="true">Run once</string>
   <string name="mcp_tool_revoke" translatable="true" description="Button label to confirm revoking automatic permission for a tool. [CHAR_LIMIT=8]">Revoke</string>
   <string name="mcp_tool_revoke_permission" translatable="true" description="Button label to initiate revoking &quot;always allow&quot; permission for a tool. [CHAR_LIMIT=29]">Revoke tool call permission</string>
   <string name="mcp_tool_revoke_permission_title" translatable="true" description="Title of the confirmation dialog for revoking tool permission. [CHAR_LIMIT=20]">Revoke permission?</string>
@@ -771,6 +776,49 @@
   <string name="jarvis_settings_description" translatable="true">API key, system instructions, and personality</string>
   <string name="jarvis_skills_description" translatable="true">Install and choose capabilities for every agent</string>
   <string name="jarvis_mcp_description" translatable="true">Connect external tools and services</string>
+  <string name="jarvis_terminal_description" translatable="true">Permission-gated Termux, tmux, and ADB</string>
+  <string name="termux_setup_title" translatable="true">Terminal &amp; ADB</string>
+  <string name="termux_setup_description" translatable="true">Native agent commands run in a persistent tmux session through Termux</string>
+  <string name="termux_app_status" translatable="true">Termux</string>
+  <string name="termux_installed_version" translatable="true">Installed · %1$s</string>
+  <string name="termux_not_installed" translatable="true">Not installed</string>
+  <string name="termux_permission_status" translatable="true">Jarvis permission</string>
+  <string name="termux_permission_granted" translatable="true">Granted</string>
+  <string name="termux_permission_not_granted" translatable="true">Not granted</string>
+  <string name="termux_grant_permission" translatable="true">Grant Termux permission</string>
+  <string name="termux_approval_mode_title" translatable="true">Command approvals</string>
+  <string name="termux_approval_every_command" translatable="true">Approve every command</string>
+  <string name="termux_approval_every_command_description" translatable="true">Most cautious. Jarvis shows the exact command and waits for you every time.</string>
+  <string name="termux_approval_dangerous_only" translatable="true">Approve dangerous commands</string>
+  <string name="termux_approval_dangerous_only_description" translatable="true">A narrow read-only allowlist can run automatically. Writes, installs, deletion, shell operators, device changes, and unknown commands still require approval.</string>
+  <string name="termux_setup_step_title" translatable="true">Finish setup in Termux</string>
+  <string name="termux_setup_step_description" translatable="true">Copy the setup command, open Termux, paste it, and press Enter. It enables approved external commands and installs tmux plus Android platform tools. Jarvis runs every command inside the persistent android-jarvis tmux session. Keep Termux available in the background so Android can start its command service.</string>
+  <string name="termux_copy_setup_command" translatable="true">Copy setup command</string>
+  <string name="termux_setup_copied" translatable="true">Setup command copied</string>
+  <string name="termux_open_app" translatable="true">Open Termux</string>
+  <string name="termux_security_note" translatable="true">Jarvis still asks before every command. This screen does not offer permanent command approval. Commands run in tmux so the terminal environment remains available between calls.</string>
+  <string name="termux_adb_pairing_note" translatable="true">ADB actions target only this phone. If the verified connection is missing, Jarvis asks for Android\'s temporary pairing code and resumes the approved action after connecting.</string>
+  <string name="termux_test_connection" translatable="true">Test Terminal &amp; ADB</string>
+  <string name="termux_testing" translatable="true">Testing…</string>
+  <string name="termux_test_failed" translatable="true">Termux test failed.</string>
+  <string name="termux_test_failed_to_start" translatable="true">Could not start Termux. Complete the setup steps and try again.</string>
+  <string name="self_adb_pairing_channel_name" translatable="true">Self-ADB pairing</string>
+  <string name="self_adb_pairing_channel_description" translatable="true">Secure prompts used to connect Jarvis to this phone for approved ADB actions</string>
+  <string name="self_adb_pairing_notification_title" translatable="true">Pair Jarvis with this phone</string>
+  <string name="self_adb_pairing_notification_description" translatable="true">Keep the Android pairing screen open, then tap Enter pairing code below and type its six digits.</string>
+  <string name="self_adb_pairing_code_hint" translatable="true">6-digit pairing code</string>
+  <string name="self_adb_enter_pairing_code" translatable="true">Enter pairing code</string>
+  <string name="self_adb_pairing_code_invalid" translatable="true">That was not a six-digit code. Keep the pairing screen open and try again.</string>
+  <string name="self_adb_pairing_in_progress" translatable="true">Pairing Jarvis…</string>
+  <string name="self_adb_pairing_code_received" translatable="true">Code received privately. Verifying this phone now.</string>
+  <string name="self_adb_pairing_succeeded" translatable="true">Jarvis is connected</string>
+  <string name="self_adb_pairing_failed" translatable="true">Jarvis could not connect</string>
+  <string name="self_adb_setup_title" translatable="true">Wireless self-ADB</string>
+  <string name="self_adb_setup_description" translatable="true">Jarvis checks for a verified connection first. If pairing is needed, Android opens Wireless debugging directly when the phone supports it. Tap Pair device with pairing code, then enter the six digits from the Jarvis notification without leaving Settings. If Android shows Developer options instead, tap Wireless debugging first.</string>
+  <string name="self_adb_connect_button" translatable="true">Connect Jarvis to this phone</string>
+  <string name="self_adb_pairing_waiting" translatable="true">Waiting for pairing…</string>
+  <string name="self_adb_pairing_failed_to_start" translatable="true">Jarvis could not start self-ADB pairing. Open Termux once and try again.</string>
+  <string name="self_adb_permissions_required" translatable="true">Notification access is needed to enter the pairing code while Settings stays open. Android 17 and later also require local-network access to discover this phone.</string>
   <string name="community_skills_browser_description" translatable="true">Tap + beside a skill to validate and install it</string>
   <string name="community_skills_tab" translatable="true">Community</string>
   <string name="featured_skills_tab" translatable="true">Featured</string>
