@@ -21,6 +21,7 @@ import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.skills.SkillsProvider
 import com.google.ai.edge.gallery.tools.CallJsSkillResultImage
 import com.google.ai.edge.gallery.tools.CallJsSkillResultWebview
+import com.google.ai.edge.gallery.tools.CodeOnTheGoTool
 import com.google.ai.edge.gallery.tools.LoadSkillTool
 import com.google.ai.edge.gallery.tools.RunIntentTool
 import com.google.ai.edge.gallery.tools.RunJsTool
@@ -80,8 +81,17 @@ open class AgentToolsImpl : AgentTools {
 
   val termuxTerminalTool by lazy { TermuxTerminalTool(context = context) }
 
+  val codeOnTheGoTool by lazy { CodeOnTheGoTool(context = context) }
+
   override fun getAvailableTools(): List<ToolDefinition> {
-    return listOf(loadSkillTool, runMcpTool, runJsTool, runIntentTool, termuxTerminalTool) +
+    return listOf(
+      loadSkillTool,
+      runMcpTool,
+      runJsTool,
+      runIntentTool,
+      termuxTerminalTool,
+      codeOnTheGoTool,
+    ) +
       activeTools
   }
 

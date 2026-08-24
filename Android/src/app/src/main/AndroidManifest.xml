@@ -42,6 +42,7 @@
 
     <queries>
         <package android:name="com.termux" />
+        <package android:name="com.itsaky.androidide" />
     </queries>
 
     <!-- Additional permission required for push notification handling -->

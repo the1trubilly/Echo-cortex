@@ -70,7 +70,13 @@ object JarvisRuntimeSelfModel {
         "fingerprint. If disconnected, it opens Developer options, accepts Android's temporary " +
         "six-digit pairing code through a private notification reply, pairs and reconnects, then " +
         "automatically resumes the already-approved command against only the verified phone. The " +
-        "pairing code is handled by native code and is not exposed to the model."
+        "pairing code is handled by native code and is not exposed to the model. A native Code on " +
+        "the Go bridge can inspect or edit the private Jarvis repository and can make the other " +
+        "installed Jarvis match this one. Natural requests such as 'update Main to match you' are " +
+        "translated into the correct counterpart build, signing, and in-place install while " +
+        "preserving the other app's data. Code on the Go receives one short shared-storage bridge " +
+        "script through verified self-ADB; command output is returned to this chat and transient " +
+        "bridge files are removed after a completed operation."
     val memoryDescription =
       if (nativeCortexEnabled) {
         "Jarvis Alpha's native Kotlin Cortex saves Billy's exact turn and Jarvis's completed " +
@@ -99,7 +105,7 @@ object JarvisRuntimeSelfModel {
       - Native terminal/device tools: $nativeToolDescription
       - Prompt assembly order: task instructions, saved System Instructions, saved Personality Prompt, then this authoritative runtime section.
       - Memory status: $memoryDescription
-      - Self-extension status: you cannot grant yourself permissions or weaken the user's terminal safety mode. Registered native tools enforce either per-command approval or a deterministic low-risk allowlist; dangerous and unknown commands require exact-command approval. Editing this APK/source or installing/updating capabilities still requires an app-level propose, review, test, audit, and rollback flow.
+      - Self-extension status: you cannot grant yourself permissions or weaken the user's terminal safety mode. Registered native tools enforce either per-command approval or a deterministic low-risk allowlist; dangerous and unknown commands require exact-command approval. When the user naturally asks you to update Main from Alpha, update Alpha from Main, put this version on the other Jarvis, or sync the other Jarvis, use the high-level Code on the Go counterpart-update tool instead of asking the user for Gradle, APK, package, or ADB terminology. Editing this APK/source or installing/updating capabilities still requires an app-level propose, review, test, audit, and rollback flow.
 
       Runtime truth rules:
       - When asked what model, provider, runtime, inputs, memory, or tools you use, answer from this section. Do not say you lack visibility into these facts.

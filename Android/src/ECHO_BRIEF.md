@@ -1,6 +1,27 @@
 # Android Jarvis — Echo Brief
 
-## Current milestone: recoverable, permission-gated wireless self-ADB
+## Current milestone: natural-language Code on the Go development bridge
+
+Jarvis now exposes Code on the Go as a native, provider-neutral Agent Chat tool instead of making
+the user translate intent into Gradle, APK, package-name, signing, or ADB vocabulary. Jarvis can run
+approved source/build commands in Code on the Go's private `Echo-cortex/Android/src` terminal and
+return bounded command output to the same chat. Requests such as "update Main to match you," "take
+your APK and install it over Main," or "sync the other Jarvis" route to one high-level operation.
+
+Main and Alpha have different Android package identities, so one APK cannot literally overwrite the
+other. The native operation preserves that separation: Alpha builds the Main variant from the same
+phone repository and installs it in place over Main; Main builds and installs Alpha. The target
+package's existing app data is preserved by the in-place update. The operation always requires one
+explicit approval covering its hidden build and install steps, and the currently running Jarvis is
+never its own target.
+
+Code on the Go keeps ownership of its private repository, JDK, Android SDK, Gradle caches, and debug
+signing key. Jarvis uses verified self-ADB only to focus its terminal, inject a short shared-storage
+request script, collect an atomic result, and return to chat. Completed transient request/result
+files are removed. Exact free-form commands continue to obey the existing approve-every-command or
+approve-dangerous-only policy.
+
+## Prior milestone: recoverable, permission-gated wireless self-ADB
 
 Jarvis now treats wireless ADB as a recoverable native capability rather than a one-time setup task.
 After the user approves an ADB device command under the selected terminal safety mode, the native
@@ -53,6 +74,13 @@ Android Jarvis now gives OpenAI cloud models the same installed Skill/MCP execut
 
 ## Permanent architecture decisions
 
+- Natural-language development intent is the public interface. Jarvis must translate requests such
+  as "update Main to match you" into the correct variant build, package target, signing, and install
+  operation without requiring the user to know those implementation terms.
+- Main and Alpha remain separate package identities. Cross-update operations build the counterpart
+  variant from shared source and install it in place; they never relabel the running APK, clear the
+  target's data, or silently target the currently running app. A cross-update always requires one
+  explicit approval for the consequential build/install operation.
 - ADB device commands must resolve through a native self-ADB connection provider after command
   approval and before execution. Host-only inspection commands such as `adb devices -l` do not pair.
 - Jarvis may target only a connected serial whose Android build fingerprint equals the runtime
@@ -176,6 +204,10 @@ Android Jarvis now gives OpenAI cloud models the same installed Skill/MCP execut
 
 ## Non-negotiable requirements
 
+- Jarvis's normal-language development commands must work from the unified chat; Gradle tasks, APK
+  paths, package names, signing details, and ADB syntax are internal implementation details.
+- A Main/Alpha counterpart update must preserve both package separation and the target app's data,
+  must never overwrite the currently running Jarvis, and must require explicit user approval.
 - Main and Alpha must remain installable side by side with independent application data.
 - Alpha must never clear, overwrite, migrate in place, or silently copy Main's settings or memories.
 - Billy's exact message and Jarvis's exact completed response must both be persisted distinctly.
@@ -220,6 +252,13 @@ Android Jarvis now gives OpenAI cloud models the same installed Skill/MCP execut
 
 ## Relevant repository discoveries
 
+- Code on the Go stores this clone at
+  `/data/data/com.itsaky.androidide/files/home/Echo-cortex/Android/src`. Its app sandbox is not
+  directly readable through `run-as`, so the working bridge executes inside Code on the Go's own
+  terminal after verified self-ADB focuses and types a short shared-storage request.
+- The phone-side project can build both `assembleDebug` (Main) and `assembleAlpha` (Alpha). Matching
+  the Code on the Go debug signing key to the Windows development key allows in-place updates without
+  clearing the installed target app's data.
 - The Android project root is `Android/src`; the Git root is two levels above it.
 - The untouched branch was `main`, ahead of `origin/main` by 11 commits. Billy's untracked `.idea/`
   directory and `gradle/gradle-daemon-jvm.properties` predated this milestone and were preserved.

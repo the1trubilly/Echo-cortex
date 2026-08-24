@@ -1,6 +1,68 @@
 # Android Jarvis — Echo Handoff
 
-## Current milestone: recoverable, permission-gated wireless self-ADB
+## Current milestone: natural-language Code on the Go development bridge
+
+### Scope implemented
+
+- Added a native Code on the Go tool to the unified Jarvis chat. It can report setup status and run
+  approved commands from Code on the Go's private Jarvis repository.
+- Added the high-level `updateOtherJarvisToMatchThisOne` operation. Alpha maps to the Main build and
+  package; Main maps to the Alpha build and package. One approval covers the build and in-place
+  installation, and the target app's existing data is preserved.
+- Taught Jarvis to understand ordinary phrases such as "update Main to match you" and to use the
+  high-level operation without asking Billy for Gradle, APK, package, signing, or ADB terminology.
+- Reused the verified self-ADB connection recovery and terminal approval modes. The model never
+  receives the ADB serial or generated bridge script.
+- Enabled safe Gradle configuration caching, build caching, parallel work, and daemon reuse for
+  repeat Windows and phone builds.
+
+### Exact files changed
+
+- `app/src/main/java/com/google/ai/edge/gallery/tools/CodeOnTheGoTool.kt` - native status, command,
+  natural counterpart-update operation, approval gate, Code on the Go terminal bridge, result
+  protocol, and Main/Alpha mapping.
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/AgentTools.kt` - registers the
+  Code on the Go capability in the shared Jarvis tool inventory.
+- `app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/JarvisRuntimeSelfModel.kt` -
+  describes the real capability and natural-language routing rule.
+- `app/src/main/AndroidManifest.xml` - declares Code on the Go for Android package visibility.
+- `app/src/test/java/com/google/ai/edge/gallery/tools/CodeOnTheGoToolTest.kt` - covers status,
+  approval/denial, safe command behavior, counterpart mapping, build/install orchestration, atomic
+  bridge requests, and display-size parsing.
+- `gradle.properties` - enables configuration cache, task cache, parallel work, and daemon reuse.
+- `ECHO_BRIEF.md` and `ECHO_HANDOFF.md` - record the architecture, evidence, and remaining boundary.
+
+### Commands and evidence
+
+- Focused `CodeOnTheGoToolTest` passed.
+- All `com.google.ai.edge.gallery.tools.*` unit tests passed with `BUILD SUCCESSFUL`.
+- `gradlew.bat clean assembleAlpha` returned `BUILD SUCCESSFUL` in 1 minute 18 seconds.
+- A repeat `assembleAlpha` reused the configuration cache, found all 50 tasks up to date, and
+  returned `BUILD SUCCESSFUL` in 1 second.
+- Installing `app/build/outputs/apk/alpha/app-alpha.apk` over the existing Alpha package returned
+  `Success`; Alpha launched to the Jarvis home screen.
+- A real Alpha chat request, "Use Code on the Go to tell me which folder its Jarvis project is in,"
+  invoked the new bridge and returned the private project root in 5.1 seconds. The visible transcript
+  is preserved at `docs/test-evidence/2026-08-24-code-on-the-go-chat-proof.png`.
+
+### Remaining boundary
+
+- The high-level counterpart mapping and orchestration are unit-tested, but this slice did not
+  deliberately reinstall Main during acceptance testing. A future user-approved live promotion
+  should first sync the phone repository to this commit, then exercise the one-approval operation.
+- Code on the Go must be left on a usable terminal surface for the current UI-injection bridge. A
+  future Code on the Go companion/plugin API could replace coordinate focus and keyboard injection.
+- Arbitrary source edits still depend on model planning and the existing exact-command approval
+  policy; this slice adds the execution substrate, not an autonomous rollback/review engine.
+
+### Recommended next step
+
+Add an app-level development workflow over this bridge: inspect, patch, build Alpha, launch, capture
+a screenshot, check startup logs, and present a review/rollback receipt before offering promotion to
+Main. Keep the user's request natural-language while retaining explicit approval at consequential
+steps.
+
+## Prior milestone: recoverable, permission-gated wireless self-ADB
 
 ### Scope implemented so far
 
