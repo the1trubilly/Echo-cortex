@@ -142,7 +142,18 @@ dependencies {
   implementation(libs.ktor.client.core)
 }
 
+val termuxProtoc =
+  providers.environmentVariable("PREFIX").orNull
+    ?.let { file("$it/bin/protoc") }
+    ?.takeIf { it.canExecute() }
+
 protobuf {
-  protoc { artifact = "com.google.protobuf:protoc:4.26.1" }
+  protoc {
+    if (termuxProtoc != null) {
+      path = termuxProtoc.absolutePath
+    } else {
+      artifact = "com.google.protobuf:protoc:4.26.1"
+    }
+  }
   generateProtoTasks { all().forEach { it.builtins { create("java") { option("lite") } } } }
 }
