@@ -43,8 +43,8 @@ data class CortexCaptureReceipt(
 data class CortexRecallRequest(
   val query: String,
   val currentSessionId: String,
-  val maxArtifacts: Int = 12,
-  val maxContextChars: Int = 6_000,
+  val maxArtifacts: Int = 5,
+  val maxContextChars: Int = 5_200,
 )
 
 /** Verified memory context for the internal agent boundary; external-transmission policy is separate. */

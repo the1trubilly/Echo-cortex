@@ -156,6 +156,99 @@ class CortexRecallEngineTest {
   }
 
   @Test
+  fun select_memoryTestParaphrase_findsInterviewAndRejectsPastedDocumentAsPersonalMemory() {
+    val pastedDocument =
+      (1..120).joinToString("\n") { number ->
+        "$number. I prefer that this quoted export line remain searchable as source material."
+      }
+    val candidates =
+      listOf(
+        candidate(
+          "pasted-document",
+          CortexSourceKind.USER_STATED,
+          300,
+          pastedDocument,
+        ),
+        candidate(
+          "interview",
+          CortexSourceKind.USER_STATED,
+          200,
+          "1. Billy\n2. Greenwood, Delaware\n3. Infinite Workshop\n" +
+            "4. Consciousness, simulation theory, and AI",
+        ),
+      )
+
+    val selected =
+      CortexRecallEngine.select(
+        candidatesNewestFirst = candidates,
+        query = "Tell me something about me from the memory test",
+        maxArtifacts = 5,
+        maxContextChars = 5_200,
+      )
+
+    assertEquals(listOf("interview"), selected.map { it.candidate.artifactId })
+    assertEquals(
+      0,
+      CortexRecallEngine.indexMetadata(pastedDocument, CortexSourceKind.USER_STATED)
+        .durablePersonalScore,
+    )
+  }
+
+  @Test
+  fun select_crossConversationSynthesis_surfacesDiverseMemoriesWithBoundedDetailLevels() {
+    val candidates =
+      listOf(
+        candidate(
+          "autonomy",
+          CortexSourceKind.USER_STATED,
+          500,
+          "I want Jarvis to become an autonomous collaborator that can improve its own app.",
+          sessionId = "session-autonomy",
+        ),
+        candidate(
+          "workshop",
+          CortexSourceKind.USER_STATED,
+          400,
+          "Infinite Workshop is a framework for turning ideas into tools that build more tools.",
+          sessionId = "session-workshop",
+        ),
+        candidate(
+          "consciousness",
+          CortexSourceKind.USER_STATED,
+          300,
+          "I care about consciousness, simulation theory, meaning-making, and helping people.",
+          sessionId = "session-consciousness",
+        ),
+        candidate(
+          "long-related-source",
+          CortexSourceKind.USER_STATED,
+          200,
+          "Jarvis autonomy and consciousness notes. " + "detail ".repeat(2_000),
+          sessionId = "session-long",
+        ),
+      )
+
+    val selected =
+      CortexRecallEngine.select(
+        candidatesNewestFirst = candidates,
+        query =
+          "Across our conversations, synthesize how Jarvis, Infinite Workshop, " +
+            "consciousness, and autonomy fit together",
+        maxArtifacts = 5,
+        maxContextChars = 5_200,
+      )
+
+    assertTrue(selected.size >= 3)
+    assertTrue(selected.any { it.candidate.artifactId == "autonomy" })
+    assertTrue(selected.any { it.candidate.artifactId == "workshop" })
+    assertTrue(selected.any { it.candidate.artifactId == "consciousness" })
+    assertTrue(selected.any { it.detailLevel == "EXACT_EXCERPT" })
+    val context = CortexRecallEngine.buildModelContext(selected)
+    assertTrue(context.contains("readable, bounded slice of prior chats"))
+    assertTrue(context.contains("separating Billy's statements from your inferences"))
+  }
+
+  @Test
   fun select_broadRecallWithNoDurableStatements_returnsNoPacket() {
     val selected =
       CortexRecallEngine.select(

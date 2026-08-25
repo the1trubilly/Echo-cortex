@@ -76,7 +76,9 @@ class AlphaCortexDeviceTest {
       runtime.recall(
         CortexRecallRequest(
           query = "Where do I live?",
-          currentSessionId = "device-test-new-session",
+          // The chat UI may recycle a session ID across a surface reset. Prior verified turns in
+          // the same logical session must remain retrievable; the current turn is not captured yet.
+          currentSessionId = "device-test-session",
         )
       )
     assertTrue(recall.message, recall.verified)
@@ -86,24 +88,71 @@ class AlphaCortexDeviceTest {
       runtime.recall(
         CortexRecallRequest(
           query = "Hey Echo what do you remember about me",
-          currentSessionId = "device-test-new-session",
+          currentSessionId = "device-test-session",
         )
       )
     assertTrue(broadRecall.message, broadRecall.verified)
     assertTrue(broadRecall.contextForModel.contains("Greenwood, Delaware"))
     assertEquals(1, broadRecall.artifactIds.size)
+    val memoryTestRecall =
+      runtime.recall(
+        CortexRecallRequest(
+          query = "Tell me something about me from the memory test",
+          currentSessionId = "a-new-user-visible-chat",
+        )
+      )
+    assertTrue(memoryTestRecall.message, memoryTestRecall.verified)
+    assertTrue(memoryTestRecall.contextForModel.contains("Greenwood, Delaware"))
+    assertEquals(1, memoryTestRecall.artifactIds.size)
+    val synthesisMemories =
+      listOf(
+        "device-synthesis-autonomy" to
+          "I want Jarvis to become an autonomous collaborator that can improve its own app.",
+        "device-synthesis-workshop" to
+          "Infinite Workshop is a framework for turning ideas into tools that build more tools.",
+        "device-synthesis-consciousness" to
+          "I care about consciousness, simulation theory, meaning-making, and helping people.",
+      )
+    synthesisMemories.forEachIndexed { index, (sessionId, memory) ->
+      val synthesisCapture =
+        runtime.captureExchange(
+          CortexExchangeCaptureRequest(
+            sessionId = sessionId,
+            taskId = "llm_agent_chat",
+            modelName = "device-test-model",
+            userMessage = memory,
+            assistantResponse = "Saved synthesis memory ${index + 1}.",
+            completedAtEpochMs = System.currentTimeMillis() + index + 1,
+          )
+        )
+      assertTrue(synthesisCapture.message, synthesisCapture.verified)
+    }
+    val synthesisRecall =
+      runtime.recall(
+        CortexRecallRequest(
+          query =
+            "Across our conversations, synthesize how Jarvis, Infinite Workshop, " +
+              "consciousness, and autonomy fit together",
+          currentSessionId = "device-synthesis-new-chat",
+        )
+      )
+    assertTrue(synthesisRecall.message, synthesisRecall.verified)
+    assertTrue(synthesisRecall.contextForModel.contains("autonomous collaborator"))
+    assertTrue(synthesisRecall.contextForModel.contains("Infinite Workshop"))
+    assertTrue(synthesisRecall.contextForModel.contains("consciousness"))
+    assertTrue(synthesisRecall.artifactIds.size >= 3)
     val retrievalFiles =
       retrievalDirectory.listFiles().orEmpty().filter { file -> file.name !in retrievalNamesBefore }
-    assertEquals(2, retrievalFiles.size)
+    assertEquals(4, retrievalFiles.size)
     retrievalFiles.forEach { file ->
       assertTrue("document_type: memory_cycle_retrieval_receipt" in file.readText())
       assertTrue("verified: true" in file.readText())
     }
 
     val after = runtime.status.value
-    assertEquals(before.verifiedExchanges + 1, after.verifiedExchanges)
-    assertEquals(before.verifiedArtifacts + 2, after.verifiedArtifacts)
-    assertEquals(before.verifiedRecalls + 2, after.verifiedRecalls)
+    assertEquals(before.verifiedExchanges + 4, after.verifiedExchanges)
+    assertEquals(before.verifiedArtifacts + 8, after.verifiedArtifacts)
+    assertEquals(before.verifiedRecalls + 4, after.verifiedRecalls)
     val reopenedIndex = CortexIndexDatabase(context)
     try {
       assertEquals(after.verifiedExchanges, reopenedIndex.counts().exchanges)
