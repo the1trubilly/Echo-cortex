@@ -175,6 +175,7 @@ internal object CortexMarkdownCodec {
         appendLine("candidate_count: $candidateCount")
         appendLine("selected_count: ${selected.size}")
         appendLine("retrieval_intent: ${intent.name.lowercase()}")
+        appendLine("normalizer_version: ${CortexMemoryNormalizer.VERSION}")
         appendLine("physics_candidate_pool: ${field.profile.candidatePool}")
         appendLine("physics_ticks: ${field.profile.ticks}")
         appendLine("physics_degraded: ${field.degraded}")
@@ -196,6 +197,22 @@ internal object CortexMarkdownCodec {
               "mass `${artifact.candidate.physicsMass}` | ${artifact.whySurfaced}"
           )
           appendLine("   - forces: ${artifact.candidate.forceSummary}")
+          appendLine(
+            "   - temporal: ${artifact.candidate.temporalStatus}; " +
+              "statement: ${artifact.candidate.statementKind}; " +
+              "correction_cue: ${artifact.candidate.correctionCue}"
+          )
+          artifact.candidate.typedRelations
+            .filter { relation -> relation.relationType == "POSSIBLY_CORRECTS" }
+            .take(3)
+            .forEach { relation ->
+              appendLine(
+                "   - typed_relation: ${relation.direction} ${relation.relationType} " +
+                  "`${relation.otherArtifactId}`; confidence=${relation.confidence}; " +
+                  "status=${relation.confirmationStatus}; authority=${relation.authorityCeiling}"
+              )
+              appendLine("     evidence: ${relation.evidenceBasis}")
+            }
           appendLine("   - authority: inform_only")
         }
         appendLine()
@@ -214,6 +231,73 @@ internal object CortexMarkdownCodec {
           "Activation, mass, spread, and forces are navigation facts only; they do not change " +
             "truth, confirmation, privacy, authority, or permission."
         )
+      }
+      .toByteArray(StandardCharsets.UTF_8)
+
+  fun encodeNormalizationSidecar(
+    artifactId: String,
+    sourceKind: CortexSourceKind,
+    sourceContentHash: String,
+    sourceLocation: String,
+    sourceDocumentHash: String,
+    capturedAtEpochMs: Long,
+    normalizedAtEpochMs: Long,
+    metadata: CortexNormalizationMetadata,
+  ): ByteArray =
+    buildString {
+        appendLine("---")
+        appendLine("threadkeeper_schema: 13")
+        appendLine("document_type: memory_normalization_sidecar")
+        appendLine("normalizer_version: ${metadata.version}")
+        appendLine("source_artifact_id: ${yaml(artifactId)}")
+        appendLine("source_kind: ${sourceKind.name}")
+        appendLine("source_content_sha256: $sourceContentHash")
+        appendLine("source_document_sha256: $sourceDocumentHash")
+        appendLine("source_location: ${yaml(sourceLocation)}")
+        appendLine("observed_at: ${yaml(Instant.ofEpochMilli(capturedAtEpochMs).toString())}")
+        appendLine("recorded_at: ${yaml(Instant.ofEpochMilli(capturedAtEpochMs).toString())}")
+        appendLine("normalized_at: ${yaml(Instant.ofEpochMilli(normalizedAtEpochMs).toString())}")
+        appendLine("statement_kind: ${metadata.statementKind}")
+        appendLine("temporal_status: ${metadata.temporalStatus}")
+        appendLine("modality: ${metadata.modality}")
+        appendLine("correction_cue: ${metadata.correctionCue}")
+        appendLine("projection_sha256: ${metadata.projectionHash}")
+        appendLine("origin_class: derived_index")
+        appendLine("origin_trust: derived")
+        appendLine("confirmation_status: UNCONFIRMED")
+        appendLine("authority_ceiling: inform_only")
+        appendLine("source_was_modified: false")
+        appendLine("verified: true")
+        appendLine("---")
+        appendLine()
+        appendLine("# ${metadata.title.replace("#", "\\#")}")
+        appendLine()
+        appendLine("> [!warning] Derived navigation sidecar")
+        appendLine("> This file does not replace, summarize, confirm, or supersede its exact source.")
+        appendLine("> Delete and rebuild it at any time; the source Markdown and hashes remain truth.")
+        appendLine()
+        appendLine("## Memory handle")
+        appendLine()
+        appendLine("- Statement kind: `${metadata.statementKind}`")
+        appendLine("- Temporal cue: `${metadata.temporalStatus}`")
+        appendLine("- Modality: `${metadata.modality}`")
+        appendLine("- Possible correction cue: `${metadata.correctionCue}`")
+        appendLine("- Authority ceiling: `inform_only`")
+        appendLine()
+        appendLine("## Concept hooks")
+        appendLine()
+        if (metadata.conceptTerms.isEmpty()) {
+          appendLine("- None derived.")
+        } else {
+          metadata.conceptTerms.forEach { concept ->
+            appendLine("- [[${concept.replace('_', ' ')}]]")
+          }
+        }
+        appendLine()
+        appendLine("## Epistemic boundary")
+        appendLine()
+        appendLine("This projection is deterministic and unconfirmed. A correction cue is a routing")
+        appendLine("hypothesis only; conflict adjudication must preserve all competing exact evidence.")
       }
       .toByteArray(StandardCharsets.UTF_8)
 

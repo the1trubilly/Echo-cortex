@@ -28,8 +28,11 @@ class AlphaCortexDeviceTest {
     val turnsDirectory = File(context.filesDir, "cortex-vault/turns")
     val receiptsDirectory = File(context.filesDir, "cortex-vault/receipts")
     val retrievalDirectory = File(context.filesDir, "cortex-vault/retrieval-receipts")
+    val normalizedDirectory = File(context.filesDir, "cortex-vault/normalized")
     val turnNamesBefore = turnsDirectory.listFiles()?.map(File::getName)?.toSet().orEmpty()
     val receiptNamesBefore = receiptsDirectory.listFiles()?.map(File::getName)?.toSet().orEmpty()
+    val normalizedNamesBefore =
+      normalizedDirectory.listFiles()?.map(File::getName)?.toSet().orEmpty()
     val billyExact =
       "Device-test Billy turn\nI live in Greenwood, Delaware.\nwith Markdown: **exact**"
     val jarvisExact = "Device-test Jarvis reply\nwith Unicode: 🧠"
@@ -53,6 +56,16 @@ class AlphaCortexDeviceTest {
       receiptsDirectory.listFiles().orEmpty().filter { file -> file.name !in receiptNamesBefore }
     assertEquals(2, newTurnFiles.size)
     assertEquals(1, newReceiptFiles.size)
+    val newNormalizationFiles =
+      normalizedDirectory.listFiles().orEmpty().filter { file -> file.name !in normalizedNamesBefore }
+    assertEquals(2, newNormalizationFiles.size)
+    newNormalizationFiles.forEach { file ->
+      val text = file.readText()
+      assertTrue("document_type: memory_normalization_sidecar" in text)
+      assertTrue("normalizer_version: 1" in text)
+      assertTrue("source_was_modified: false" in text)
+      assertTrue("authority_ceiling: inform_only" in text)
+    }
 
     val contentBySource =
       newTurnFiles.associate { file ->
@@ -141,9 +154,46 @@ class AlphaCortexDeviceTest {
     assertTrue(synthesisRecall.contextForModel.contains("Infinite Workshop"))
     assertTrue(synthesisRecall.contextForModel.contains("consciousness"))
     assertTrue(synthesisRecall.artifactIds.size >= 3)
+    val olderPreference =
+      runtime.captureExchange(
+        CortexExchangeCaptureRequest(
+          sessionId = "device-correction-old",
+          taskId = "llm_agent_chat",
+          modelName = "device-test-model",
+          userMessage = "My favorite lighthouse color is blue.",
+          assistantResponse = "Saved the older lighthouse preference.",
+          completedAtEpochMs = System.currentTimeMillis() + 10,
+        )
+      )
+    assertTrue(olderPreference.message, olderPreference.verified)
+    val newerPreference =
+      runtime.captureExchange(
+        CortexExchangeCaptureRequest(
+          sessionId = "device-correction-new",
+          taskId = "llm_agent_chat",
+          modelName = "device-test-model",
+          userMessage =
+            "Actually, my favorite lighthouse color is green now, not blue.",
+          assistantResponse = "Saved the newer lighthouse preference without deleting history.",
+          completedAtEpochMs = System.currentTimeMillis() + 20,
+        )
+      )
+    assertTrue(newerPreference.message, newerPreference.verified)
+    val correctionRecall =
+      runtime.recall(
+        CortexRecallRequest(
+          query = "What is my favorite lighthouse color?",
+          currentSessionId = "device-correction-fresh-chat",
+        )
+      )
+    assertTrue(correctionRecall.message, correctionRecall.verified)
+    assertTrue(correctionRecall.contextForModel.contains("favorite lighthouse color is blue"))
+    assertTrue(correctionRecall.contextForModel.contains("favorite lighthouse color is green now"))
+    assertTrue(correctionRecall.contextForModel.contains("POSSIBLY_CORRECTS"))
+    assertTrue(correctionRecall.contextForModel.contains("not an adjudication"))
     val retrievalFiles =
       retrievalDirectory.listFiles().orEmpty().filter { file -> file.name !in retrievalNamesBefore }
-    assertEquals(4, retrievalFiles.size)
+    assertEquals(5, retrievalFiles.size)
     retrievalFiles.forEach { file ->
       val receiptText = file.readText()
       assertTrue("document_type: memory_cycle_retrieval_receipt" in receiptText)
@@ -155,9 +205,9 @@ class AlphaCortexDeviceTest {
     }
 
     val after = runtime.status.value
-    assertEquals(before.verifiedExchanges + 4, after.verifiedExchanges)
-    assertEquals(before.verifiedArtifacts + 8, after.verifiedArtifacts)
-    assertEquals(before.verifiedRecalls + 4, after.verifiedRecalls)
+    assertEquals(before.verifiedExchanges + 6, after.verifiedExchanges)
+    assertEquals(before.verifiedArtifacts + 12, after.verifiedArtifacts)
+    assertEquals(before.verifiedRecalls + 5, after.verifiedRecalls)
     val reopenedIndex = CortexIndexDatabase(context)
     try {
       assertEquals(after.verifiedExchanges, reopenedIndex.counts().exchanges)
@@ -167,7 +217,18 @@ class AlphaCortexDeviceTest {
       assertTrue(countRows(db, "concepts") > 0)
       assertTrue(countRows(db, "artifact_concepts") >= after.verifiedArtifacts)
       assertTrue(countRows(db, "concept_edges") > 0)
+      assertEquals(after.verifiedArtifacts, countRows(db, "normalization_receipts"))
+      assertTrue(countRows(db, "artifact_relations") > 0)
+      assertTrue(countRows(db, "artifact_relations", "relation_type = 'POSSIBLY_CORRECTS'") > 0)
       assertEquals(0, countRows(db, "artifacts", "cognitive_indexed = 0"))
+      assertEquals(
+        0,
+        countRows(
+          db,
+          "artifacts",
+          "normalization_version < ${CortexMemoryNormalizer.VERSION}",
+        ),
+      )
       assertEquals(0, countRows(db, "artifacts", "authority_ceiling != 'inform_only'"))
     } finally {
       reopenedIndex.close()

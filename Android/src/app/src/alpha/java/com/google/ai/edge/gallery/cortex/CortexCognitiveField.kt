@@ -121,7 +121,8 @@ internal class CortexCognitiveField {
           durableScore = durable,
           queryResonance = resonance,
           seed = max(resonance * 0.88, durableSeed).coerceIn(0.0, 1.0),
-          correctionCue = CORRECTION_CUE.containsMatchIn(candidate.exactContent),
+          correctionCue =
+            candidate.correctionCue || CORRECTION_CUE.containsMatchIn(candidate.exactContent),
         )
       }
     val byId = nodes.associateBy { it.candidate.artifactId }
@@ -306,11 +307,25 @@ internal class CortexCognitiveField {
           days <= 45.0 -> 0.20
           else -> 0.0
         }
+        val typedRelation =
+          left.candidate.typedRelations
+            .filter { relation -> relation.otherArtifactId == right.candidate.artifactId }
+            .maxByOrNull(CortexTypedRelation::strength)
+            ?: right.candidate.typedRelations
+              .filter { relation -> relation.otherArtifactId == left.candidate.artifactId }
+              .maxByOrNull(CortexTypedRelation::strength)
+        val typedCorrection = typedRelation?.relationType == "POSSIBLY_CORRECTS"
         val strength =
-          maxOf(semantic * 0.55, if (sharedExchange) 0.62 else 0.0, if (sharedSession) 0.42 else 0.0)
+          maxOf(
+              semantic * 0.55,
+              if (sharedExchange) 0.62 else 0.0,
+              if (sharedSession) 0.42 else 0.0,
+              typedRelation?.strength ?: 0.0,
+            )
             .coerceIn(0.0, 1.0)
         if (strength < MIN_RELATION_STRENGTH) continue
-        val looksConflicted = left.correctionCue.xor(right.correctionCue) && semantic >= 0.25
+        val looksConflicted =
+          typedCorrection || (left.correctionCue.xor(right.correctionCue) && semantic >= 0.25)
         val signed = if (looksConflicted) -strength * 0.60 else strength
         val cohesion =
           ((if (sharedSession) 0.09 else 0.0) +
@@ -320,7 +335,9 @@ internal class CortexCognitiveField {
             .coerceIn(0.0, 1.0)
         val basis =
           when {
+            typedCorrection -> "typed POSSIBLY_CORRECTS route; preserve both exact sources"
             looksConflicted -> "possible correction/conflict"
+            typedRelation != null -> "typed ${typedRelation.relationType.lowercase()} route"
             sharedExchange -> "shared exchange"
             sharedSession -> "shared conversation"
             else -> "shared concepts"

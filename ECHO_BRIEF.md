@@ -8,7 +8,8 @@ acceptance tests passed on the connected phone on 2026-08-24.
 
 This now includes a native schema-13 cognitive-field skeleton from ThreadKeeper 4.0.1: persistent
 concept/link navigation, bounded associative expansion, memory physics, auditable memory handles,
-and safe exact/excerpt DMR. It is not yet the complete cognitive engine.
+safe exact/excerpt DMR, versioned normalization sidecars, and provisional temporal/correction
+routes. It is not yet the complete cognitive engine.
 
 ## Permanent architecture decisions
 
@@ -26,6 +27,10 @@ and safe exact/excerpt DMR. It is not yet the complete cognitive engine.
   and memory physics may route attention but may not manufacture truth.
 - Derived concepts and links have an `inform_only` authority ceiling. They remain unconfirmed,
   rebuildable index data and never become independent corroboration of a memory.
+- Transformation cannot increase authority. Normalization may classify routing hooks but may not
+  rewrite, summarize, confirm, or supersede exact source Markdown.
+- Corrections preserve history. A newer explicit correction creates a `POSSIBLY_CORRECTS` route;
+  both exact artifacts remain active until a separate evidence-backed adjudication is authorized.
 - Legacy-index maintenance is incremental and non-destructive. It verifies old Markdown and
   rebuilds derived metadata in the background; it does not rewrite canonical memories.
 
@@ -50,7 +55,7 @@ and safe exact/excerpt DMR. It is not yet the complete cognitive engine.
 
 ## Native schema-13 cognitive field now present
 
-1. SQLite index version 5 stores explicit origin, trust, authority, privacy, disclosure,
+1. SQLite index version 6 stores explicit origin, trust, authority, privacy, disclosure,
    quarantine, eligibility, memory-state, observed-time, and recorded-time metadata.
 2. Captures and verified legacy Markdown are indexed into bounded lexical/phrase concepts.
 3. Concept co-occurrence links form a persistent, rebuildable lattice. Links are marked
@@ -66,6 +71,26 @@ and safe exact/excerpt DMR. It is not yet the complete cognitive engine.
 8. The hot path reuses precomputed derived terms while still reading and hash-verifying exact
    Markdown before model injection. On Billy's live vault the verified synthesis cycle completed
    all three ticks in 40.56 ms without degradation.
+
+## Native normalization and correction layer now present
+
+1. Every new exact artifact receives a deterministic schema-13 Markdown normalization sidecar in
+   the Obsidian vault. Existing verified turns migrate incrementally in bounded background batches.
+2. Sidecars record the exact source IDs/hashes/location, normalizer version, observed/recorded
+   time, statement type, temporal cue, modality, correction cue, concept hooks, projection hash,
+   and the `inform_only`/`UNCONFIRMED` boundary.
+3. Deterministic filenames plus replace-in-place vault writes and SQLite normalization receipts
+   make migration idempotent without changing the canonical source.
+4. Typed artifact relations include `SAME_EXCHANGE_CONTEXT`, `SAME_SESSION_CONTEXT`,
+   `SEMANTIC_OVERLAP`, and `POSSIBLY_CORRECTS`, each with strength, confidence, exact evidence
+   basis, independence state, confirmation status, and authority ceiling.
+5. Correction pairs influence associative routing and repulsion but never adjudicate truth. The
+   selector keeps both exact USER_STATED artifacts together so the model can explain what changed.
+6. Background migration releases the mutation gate between eight-artifact batches; foreground
+   recall repairs at most two artifacts, preventing maintenance from blocking the chat UI.
+7. The live fresh-chat Blue Lantern to Green Lantern acceptance test retrieved both statements,
+   identified the newer scoped correction, separated memory from inference, ran all three physics
+   ticks in 51.51 ms, and did not degrade.
 
 ## Non-negotiable product requirements
 
@@ -98,13 +123,16 @@ and safe exact/excerpt DMR. It is not yet the complete cognitive engine.
 
 Build upward from the verified schema-13 hot path:
 
-1. Versioned Markdown sidecars and idempotent migration receipts for old/unstructured material.
-2. Typed semantic/causal/temporal/contradiction links with validity windows and evidence support.
-3. Durable multi-resolution summaries and Matryoshka embeddings while retaining exact Markdown as
+1. Add explicit conflict sets and preview/apply adjudication receipts so Billy can confirm,
+   dispute, or supersede a provisional correction without deleting history.
+2. Extend temporal metadata from wording cues to separately sourced event, observed, recorded,
+   valid-from, and valid-to times; never infer causality from ordering alone.
+3. Add richer evidence-backed semantic and causal link types plus worldline/exposure genealogy.
+4. Durable multi-resolution summaries and Matryoshka embeddings while retaining exact Markdown as
    truth and preventing lossy summaries from becoming canonical.
-4. Lifecycle and reconsolidation machinery: supersession, contradiction review, open loops,
+5. Lifecycle and reconsolidation machinery: supersession, contradiction review, open loops,
    policies, routines, outcomes, and worldline/genealogy boundaries.
-5. Health, recovery, graph inspection, and receipt inspection UI that stays understandable to a
+6. Health, recovery, graph inspection, and receipt inspection UI that stays understandable to a
    non-technical user.
 
 Do not attempt all of these in one unverified rewrite. Preserve the now-working user-visible recall

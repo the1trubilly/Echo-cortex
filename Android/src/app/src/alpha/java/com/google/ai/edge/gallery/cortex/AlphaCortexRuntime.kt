@@ -52,8 +52,12 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
     // startup. Recall also repairs one batch synchronously, so a request never depends solely on
     // this background pass.
     maintenanceScope.launch {
-      mutationMutex.withLock {
-        while (backfillRecallIndex() > 0) yield()
+      while (true) {
+        val indexedCount =
+          mutationMutex.withLock { backfillRecallIndex(batchLimit = BACKGROUND_INDEX_BATCH) }
+        if (indexedCount == 0) break
+        // Release the mutation gate between batches so foreground capture/recall can proceed.
+        yield()
       }
     }
   }
@@ -76,6 +80,18 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
             CortexRecallEngine.indexMetadata(request.userMessage, CortexSourceKind.USER_STATED)
           val assistantRecallMetadata =
             CortexRecallEngine.indexMetadata(request.assistantResponse, CortexSourceKind.OTHER_AGENT)
+          val userNormalization =
+            CortexMemoryNormalizer.normalize(
+              content = request.userMessage,
+              sourceKind = CortexSourceKind.USER_STATED,
+              recallMetadata = userRecallMetadata,
+            )
+          val assistantNormalization =
+            CortexMemoryNormalizer.normalize(
+              content = request.assistantResponse,
+              sourceKind = CortexSourceKind.OTHER_AGENT,
+              recallMetadata = assistantRecallMetadata,
+            )
           val timestamp = request.completedAtEpochMs
 
           val userBytes =
@@ -128,6 +144,28 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
               bytes = assistantBytes,
             )
 
+          val normalizedAt = System.currentTimeMillis()
+          val userNormalizationSidecar =
+            writeNormalizationSidecar(
+              artifactId = userArtifactId,
+              sourceKind = CortexSourceKind.USER_STATED,
+              sourceContentHash = userContentHash,
+              sourceDocument = userDocument,
+              capturedAtEpochMs = timestamp,
+              normalizedAtEpochMs = normalizedAt,
+              metadata = userNormalization,
+            )
+          val assistantNormalizationSidecar =
+            writeNormalizationSidecar(
+              artifactId = assistantArtifactId,
+              sourceKind = CortexSourceKind.OTHER_AGENT,
+              sourceContentHash = assistantContentHash,
+              sourceDocument = assistantDocument,
+              capturedAtEpochMs = timestamp,
+              normalizedAtEpochMs = normalizedAt,
+              metadata = assistantNormalization,
+            )
+
           val receiptBytes =
             CortexMarkdownCodec.encodeExchangeReceipt(
               exchangeId = exchangeId,
@@ -165,6 +203,8 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
                   recallTerms = userRecallMetadata.normalizedTerms,
                   durablePersonalScore = userRecallMetadata.durablePersonalScore,
                   conceptTerms = userRecallMetadata.conceptTerms,
+                  normalization = userNormalization,
+                  normalizationSidecar = userNormalizationSidecar,
                 ),
                 IndexedArtifact(
                   artifactId = assistantArtifactId,
@@ -176,6 +216,8 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
                   recallTerms = assistantRecallMetadata.normalizedTerms,
                   durablePersonalScore = assistantRecallMetadata.durablePersonalScore,
                   conceptTerms = assistantRecallMetadata.conceptTerms,
+                  normalization = assistantNormalization,
+                  normalizationSidecar = assistantNormalizationSidecar,
                 ),
               ),
           )
@@ -208,7 +250,9 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
           require(request.query.isNotBlank()) { "Recall query is empty." }
           val maxArtifacts = request.maxArtifacts.coerceIn(1, 8)
           val maxContextChars = request.maxContextChars.coerceIn(1_000, 5_200)
-          backfillRecallIndex()
+          // Repair a tiny foreground slice only. Existing v5 search/graph metadata remains usable
+          // while v6 normalization sidecars continue migrating incrementally in the background.
+          backfillRecallIndex(batchLimit = FOREGROUND_INDEX_BATCH)
           val recallIntent = CortexRecallEngine.recallIntent(request.query)
           val directCandidates =
             index.recallCandidates(
@@ -225,6 +269,10 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
             (directCandidates + associativeCandidates)
               .distinctBy(IndexedRecallCandidate::artifactId)
               .take(64)
+          val typedRelations =
+            index.typedRelationsForArtifacts(
+              indexedCandidates.map(IndexedRecallCandidate::artifactId)
+            )
           val readableCandidates =
             indexedCandidates.mapNotNull { candidate ->
               runCatching {
@@ -248,6 +296,38 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
                         .take(256)
                         .toSet(),
                     indexedDurablePersonalScore = candidate.durablePersonalScore,
+                    statementKind = candidate.statementKind,
+                    temporalStatus = candidate.temporalStatus,
+                    modality = candidate.modality,
+                    correctionCue = candidate.correctionCue,
+                    typedRelations =
+                      typedRelations.mapNotNull { relation ->
+                        when (candidate.artifactId) {
+                          relation.sourceArtifactId ->
+                            CortexTypedRelation(
+                              otherArtifactId = relation.targetArtifactId,
+                              direction = "outgoing",
+                              relationType = relation.relationType,
+                              strength = relation.strength,
+                              confidence = relation.confidence,
+                              evidenceBasis = relation.evidenceBasis,
+                              confirmationStatus = relation.confirmationStatus,
+                              authorityCeiling = relation.authorityCeiling,
+                            )
+                          relation.targetArtifactId ->
+                            CortexTypedRelation(
+                              otherArtifactId = relation.sourceArtifactId,
+                              direction = "incoming",
+                              relationType = relation.relationType,
+                              strength = relation.strength,
+                              confidence = relation.confidence,
+                              evidenceBasis = relation.evidenceBasis,
+                              confirmationStatus = relation.confirmationStatus,
+                              authorityCeiling = relation.authorityCeiling,
+                            )
+                          else -> null
+                        }
+                      },
                   )
                 }
                 .getOrNull()
@@ -264,6 +344,7 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
             TAG,
             "Cortex schema-13 field: direct=${directCandidates.size}, " +
               "associative=${associativeCandidates.size}, verified=${readableCandidates.size}, " +
+              "typed_relations=${typedRelations.size}, " +
               "spread=${field.spreadCandidateCount}, ticks=${field.trace.size}, " +
               "degraded=${field.degraded}, ms=${"%.2f".format(field.operationMs)}",
           )
@@ -466,16 +547,47 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
   private fun sanitizeCollectionName(name: String): String =
     name.replace(Regex("[^A-Za-z0-9._-]"), "_").take(80).ifBlank { "collection" }
 
+  private fun writeNormalizationSidecar(
+    artifactId: String,
+    sourceKind: CortexSourceKind,
+    sourceContentHash: String,
+    sourceDocument: StoredVaultDocument,
+    capturedAtEpochMs: Long,
+    normalizedAtEpochMs: Long,
+    metadata: CortexNormalizationMetadata,
+  ): StoredVaultDocument =
+    vault.writeVerified(
+      category = "normalized",
+      fileName =
+        "${artifactId}_schema13_normalizer_v${CortexMemoryNormalizer.VERSION}.md",
+      mimeType = "text/markdown",
+      bytes =
+        CortexMarkdownCodec.encodeNormalizationSidecar(
+          artifactId = artifactId,
+          sourceKind = sourceKind,
+          sourceContentHash = sourceContentHash,
+          sourceLocation = sourceDocument.location,
+          sourceDocumentHash = sourceDocument.documentSha256,
+          capturedAtEpochMs = capturedAtEpochMs,
+          normalizedAtEpochMs = normalizedAtEpochMs,
+          metadata = metadata,
+        ),
+    )
+
   /**
    * Rebuilds only derived search metadata, never canonical Markdown. Oldest + newest batching keeps
    * historic identity memories and current work searchable even when a very large vault is being
    * repaired incrementally.
    */
-  private fun backfillRecallIndex(): Int {
+  private fun backfillRecallIndex(batchLimit: Int = BACKGROUND_INDEX_BATCH): Int {
+    val safeBatch = batchLimit.coerceIn(1, 32)
+    val oldestLimit = (safeBatch / 2).coerceAtLeast(1)
+    val newestLimit = (safeBatch - oldestLimit).coerceAtLeast(1)
     val pending =
-      (index.unindexedRecallArtifacts(limit = 128, newestFirst = false) +
-          index.unindexedRecallArtifacts(limit = 128, newestFirst = true))
+      (index.unindexedRecallArtifacts(limit = oldestLimit, newestFirst = false) +
+          index.unindexedRecallArtifacts(limit = newestLimit, newestFirst = true))
         .distinctBy(UnindexedRecallArtifact::artifactId)
+        .take(safeBatch)
     var indexedCount = 0
     pending.forEach { artifact ->
       runCatching {
@@ -484,13 +596,41 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
         require(CortexHashing.sha256(exactBytes) == artifact.contentHash) {
           "Cortex exact-content hash verification failed during recall-index rebuild."
         }
+        val recallMetadata =
+          CortexRecallEngine.indexMetadata(
+            content = exactBytes.toString(Charsets.UTF_8),
+            sourceKind = artifact.sourceKind,
+          )
+        val normalization =
+          CortexMemoryNormalizer.normalize(
+            content = exactBytes.toString(Charsets.UTF_8),
+            sourceKind = artifact.sourceKind,
+            recallMetadata = recallMetadata,
+          )
+        val normalizedAt = System.currentTimeMillis()
+        val sidecar =
+          writeNormalizationSidecar(
+            artifactId = artifact.artifactId,
+            sourceKind = artifact.sourceKind,
+            sourceContentHash = artifact.contentHash,
+            sourceDocument =
+              StoredVaultDocument(
+                location = artifact.markdownLocation,
+                documentSha256 = artifact.documentHash,
+                byteCount = document.size,
+              ),
+            capturedAtEpochMs = artifact.capturedAtEpochMs,
+            normalizedAtEpochMs = normalizedAt,
+            metadata = normalization,
+          )
         index.updateRecallMetadata(
           artifactId = artifact.artifactId,
-          metadata =
-            CortexRecallEngine.indexMetadata(
-              content = exactBytes.toString(Charsets.UTF_8),
-              sourceKind = artifact.sourceKind,
-            ),
+          metadata = recallMetadata,
+          sourceContentHash = artifact.contentHash,
+          capturedAtEpochMs = artifact.capturedAtEpochMs,
+          normalization = normalization,
+          normalizationSidecar = sidecar,
+          normalizedAtEpochMs = normalizedAt,
         )
       }
         .onSuccess { indexedCount += 1 }
@@ -503,6 +643,8 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
 
   companion object {
     private const val TAG = "AlphaCortexRuntime"
+    private const val BACKGROUND_INDEX_BATCH = 8
+    private const val FOREGROUND_INDEX_BATCH = 2
     @Volatile private var instance: AlphaCortexRuntime? = null
 
     fun get(context: Context): AlphaCortexRuntime =

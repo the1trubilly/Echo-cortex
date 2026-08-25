@@ -123,7 +123,8 @@ internal class CortexVault(private val context: Context) {
         ?: alphaRoot.createDirectory(category)
         ?: error("Could not create the $category vault directory.")
     val document =
-      directory.createFile(mimeType, fileName)
+      directory.findFile(fileName)
+        ?: directory.createFile(mimeType, fileName)
         ?: error("Could not create $fileName in the selected Alpha vault.")
     context.contentResolver.openOutputStream(document.uri, "wt")?.use { stream ->
       stream.write(bytes)
