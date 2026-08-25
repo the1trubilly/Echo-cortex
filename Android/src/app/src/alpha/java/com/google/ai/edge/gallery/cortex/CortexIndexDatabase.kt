@@ -15,6 +15,7 @@ internal data class IndexedArtifact(
   val documentHash: String,
   val recallTerms: String,
   val durablePersonalScore: Int,
+  val conceptTerms: List<String>,
 )
 
 internal data class IndexedImportCollection(
@@ -40,6 +41,8 @@ internal data class IndexedRecallCandidate(
   val contentHash: String,
   val markdownLocation: String,
   val documentHash: String,
+  val recallTerms: String,
+  val durablePersonalScore: Int,
 )
 
 internal data class UnindexedRecallArtifact(
@@ -91,11 +94,24 @@ internal class CortexIndexDatabase(context: Context) :
         recall_terms TEXT NOT NULL DEFAULT '',
         durable_personal_score INTEGER NOT NULL DEFAULT 0,
         recall_indexed INTEGER NOT NULL DEFAULT 0 CHECK (recall_indexed IN (0, 1)),
+        cognitive_indexed INTEGER NOT NULL DEFAULT 0 CHECK (cognitive_indexed IN (0, 1)),
+        origin_class TEXT NOT NULL DEFAULT 'unknown',
+        origin_id TEXT NOT NULL DEFAULT '',
+        origin_trust TEXT NOT NULL DEFAULT 'derived',
+        authority_ceiling TEXT NOT NULL DEFAULT 'inform_only',
+        privacy_scope TEXT NOT NULL DEFAULT 'general',
+        disclosure_policy TEXT NOT NULL DEFAULT 'safe_with_user',
+        quarantine_status TEXT NOT NULL DEFAULT 'none',
+        retrieval_eligible INTEGER NOT NULL DEFAULT 1 CHECK (retrieval_eligible IN (0, 1)),
+        memory_state TEXT NOT NULL DEFAULT 'active',
+        observed_at_ms INTEGER NOT NULL DEFAULT 0,
+        recorded_at_ms INTEGER NOT NULL DEFAULT 0,
         verified INTEGER NOT NULL CHECK (verified IN (0, 1))
       )
       """.trimIndent()
     )
     createArtifactSearchTable(db)
+    createCognitiveTables(db)
     db.execSQL(
       """
       CREATE TABLE import_receipts (
@@ -146,6 +162,50 @@ internal class CortexIndexDatabase(context: Context) :
       )
       db.delete("artifact_search", null, null)
     }
+    if (oldVersion < 5) {
+      // Schema-13 governance and graph data are a disposable index over canonical Markdown.
+      // Migration never rewrites or promotes the exact source artifacts.
+      db.execSQL(
+        "ALTER TABLE artifacts ADD COLUMN cognitive_indexed INTEGER NOT NULL DEFAULT 0 " +
+          "CHECK (cognitive_indexed IN (0, 1))"
+      )
+      db.execSQL("ALTER TABLE artifacts ADD COLUMN origin_class TEXT NOT NULL DEFAULT 'unknown'")
+      db.execSQL("ALTER TABLE artifacts ADD COLUMN origin_id TEXT NOT NULL DEFAULT ''")
+      db.execSQL("ALTER TABLE artifacts ADD COLUMN origin_trust TEXT NOT NULL DEFAULT 'derived'")
+      db.execSQL(
+        "ALTER TABLE artifacts ADD COLUMN authority_ceiling TEXT NOT NULL DEFAULT 'inform_only'"
+      )
+      db.execSQL("ALTER TABLE artifacts ADD COLUMN privacy_scope TEXT NOT NULL DEFAULT 'general'")
+      db.execSQL(
+        "ALTER TABLE artifacts ADD COLUMN disclosure_policy TEXT NOT NULL DEFAULT 'safe_with_user'"
+      )
+      db.execSQL("ALTER TABLE artifacts ADD COLUMN quarantine_status TEXT NOT NULL DEFAULT 'none'")
+      db.execSQL(
+        "ALTER TABLE artifacts ADD COLUMN retrieval_eligible INTEGER NOT NULL DEFAULT 1 " +
+          "CHECK (retrieval_eligible IN (0, 1))"
+      )
+      db.execSQL("ALTER TABLE artifacts ADD COLUMN memory_state TEXT NOT NULL DEFAULT 'active'")
+      db.execSQL("ALTER TABLE artifacts ADD COLUMN observed_at_ms INTEGER NOT NULL DEFAULT 0")
+      db.execSQL("ALTER TABLE artifacts ADD COLUMN recorded_at_ms INTEGER NOT NULL DEFAULT 0")
+      db.execSQL(
+        """
+        UPDATE artifacts
+        SET origin_class = CASE source_kind WHEN 'USER_STATED' THEN 'user' ELSE 'agent' END,
+            origin_id = CASE source_kind WHEN 'USER_STATED' THEN 'Billy' ELSE 'Jarvis' END,
+            origin_trust = CASE source_kind WHEN 'USER_STATED' THEN 'user' ELSE 'derived' END,
+            observed_at_ms = COALESCE(
+              (SELECT captured_at_ms FROM exchanges WHERE exchanges.exchange_id = artifacts.exchange_id),
+              0
+            ),
+            recorded_at_ms = COALESCE(
+              (SELECT captured_at_ms FROM exchanges WHERE exchanges.exchange_id = artifacts.exchange_id),
+              0
+            ),
+            cognitive_indexed = 0
+        """.trimIndent()
+      )
+      createCognitiveTables(db)
+    }
     require(newVersion <= DATABASE_VERSION) {
       "No Cortex database migration is defined from $oldVersion to $newVersion."
     }
@@ -187,6 +247,27 @@ internal class CortexIndexDatabase(context: Context) :
             put("recall_terms", artifact.recallTerms)
             put("durable_personal_score", artifact.durablePersonalScore)
             put("recall_indexed", 1)
+            put("cognitive_indexed", 1)
+            put(
+              "origin_class",
+              if (artifact.sourceKind == CortexSourceKind.USER_STATED) "user" else "agent",
+            )
+            put(
+              "origin_id",
+              if (artifact.sourceKind == CortexSourceKind.USER_STATED) "Billy" else "Jarvis",
+            )
+            put(
+              "origin_trust",
+              if (artifact.sourceKind == CortexSourceKind.USER_STATED) "user" else "derived",
+            )
+            put("authority_ceiling", "inform_only")
+            put("privacy_scope", "general")
+            put("disclosure_policy", "safe_with_user")
+            put("quarantine_status", "none")
+            put("retrieval_eligible", 1)
+            put("memory_state", "active")
+            put("observed_at_ms", request.completedAtEpochMs)
+            put("recorded_at_ms", request.completedAtEpochMs)
             put("verified", 1)
           },
         )
@@ -197,6 +278,12 @@ internal class CortexIndexDatabase(context: Context) :
             put("artifact_id", artifact.artifactId)
             put("recall_terms", artifact.recallTerms)
           },
+        )
+        indexCognitiveMetadata(
+          db = this,
+          artifactId = artifact.artifactId,
+          conceptTerms = artifact.conceptTerms,
+          capturedAtEpochMs = request.completedAtEpochMs,
         )
       }
     }
@@ -257,7 +344,7 @@ internal class CortexIndexDatabase(context: Context) :
         """
         SELECT artifact_id, source_kind, content_sha256, markdown_location, document_sha256
         FROM artifacts
-        WHERE verified = 1 AND recall_indexed = 0
+        WHERE verified = 1 AND (recall_indexed = 0 OR cognitive_indexed = 0)
         ORDER BY rowid ${if (newestFirst) "DESC" else "ASC"}
         LIMIT ?
         """.trimIndent(),
@@ -284,6 +371,15 @@ internal class CortexIndexDatabase(context: Context) :
     metadata: CortexRecallIndexMetadata,
   ) {
     writableDatabase.inTransaction {
+      val needsCognitiveIndex =
+        rawQuery(
+            "SELECT cognitive_indexed FROM artifacts WHERE artifact_id = ? AND verified = 1",
+            arrayOf(artifactId),
+          )
+          .use { cursor ->
+            require(cursor.moveToFirst()) { "Recall metadata target is missing or unverified." }
+            cursor.getInt(0) == 0
+          }
       val updated =
         update(
           "artifacts",
@@ -291,6 +387,7 @@ internal class CortexIndexDatabase(context: Context) :
             put("recall_terms", metadata.normalizedTerms)
             put("durable_personal_score", metadata.durablePersonalScore)
             put("recall_indexed", 1)
+            put("cognitive_indexed", 1)
           },
           "artifact_id = ? AND verified = 1",
           arrayOf(artifactId),
@@ -305,6 +402,27 @@ internal class CortexIndexDatabase(context: Context) :
           put("recall_terms", metadata.normalizedTerms)
         },
       )
+      if (needsCognitiveIndex) {
+        val capturedAtEpochMs =
+          rawQuery(
+              """
+              SELECT e.captured_at_ms
+              FROM artifacts a JOIN exchanges e ON e.exchange_id = a.exchange_id
+              WHERE a.artifact_id = ?
+              """.trimIndent(),
+              arrayOf(artifactId),
+            )
+            .use { cursor ->
+              require(cursor.moveToFirst()) { "Cognitive metadata exchange is missing." }
+              cursor.getLong(0)
+            }
+        indexCognitiveMetadata(
+          db = this,
+          artifactId = artifactId,
+          conceptTerms = metadata.conceptTerms,
+          capturedAtEpochMs = capturedAtEpochMs,
+        )
+      }
     }
   }
 
@@ -320,7 +438,8 @@ internal class CortexIndexDatabase(context: Context) :
           sql =
             """
             SELECT a.artifact_id, a.exchange_id, e.session_id, a.source_kind,
-                   e.captured_at_ms, a.content_sha256, a.markdown_location, a.document_sha256
+                   e.captured_at_ms, a.content_sha256, a.markdown_location, a.document_sha256,
+                   a.recall_terms, a.durable_personal_score
             FROM artifacts a
             JOIN exchanges e ON e.exchange_id = a.exchange_id
             WHERE a.verified = 1 AND e.verified = 1
@@ -341,7 +460,8 @@ internal class CortexIndexDatabase(context: Context) :
           sql =
             """
             SELECT a.artifact_id, a.exchange_id, e.session_id, a.source_kind,
-                   e.captured_at_ms, a.content_sha256, a.markdown_location, a.document_sha256
+                   e.captured_at_ms, a.content_sha256, a.markdown_location, a.document_sha256,
+                   a.recall_terms, a.durable_personal_score
             FROM artifacts a
             JOIN exchanges e ON e.exchange_id = a.exchange_id
             WHERE a.verified = 1 AND e.verified = 1
@@ -365,7 +485,8 @@ internal class CortexIndexDatabase(context: Context) :
           sql =
             """
             SELECT a.artifact_id, a.exchange_id, e.session_id, a.source_kind,
-                   e.captured_at_ms, a.content_sha256, a.markdown_location, a.document_sha256
+                   e.captured_at_ms, a.content_sha256, a.markdown_location, a.document_sha256,
+                   a.recall_terms, a.durable_personal_score
             FROM artifact_search
             JOIN artifacts a ON a.artifact_id = artifact_search.artifact_id
             JOIN exchanges e ON e.exchange_id = a.exchange_id
@@ -392,7 +513,8 @@ internal class CortexIndexDatabase(context: Context) :
         sql =
           """
           SELECT a.artifact_id, a.exchange_id, e.session_id, a.source_kind,
-                 e.captured_at_ms, a.content_sha256, a.markdown_location, a.document_sha256
+                 e.captured_at_ms, a.content_sha256, a.markdown_location, a.document_sha256,
+                 a.recall_terms, a.durable_personal_score
           FROM artifacts a
           JOIN exchanges e ON e.exchange_id = a.exchange_id
           WHERE a.verified = 1 AND e.verified = 1 AND e.session_id IN ($placeholders)
@@ -406,6 +528,61 @@ internal class CortexIndexDatabase(context: Context) :
       .distinctBy(IndexedRecallCandidate::artifactId)
       .take(safeLimit)
       .sortedByDescending(IndexedRecallCandidate::capturedAtEpochMs)
+  }
+
+  /**
+   * Expands direct artifacts through the persistent, rebuildable concept lattice. Edges are
+   * explicitly derived and inform-only; callers still verify every returned Markdown artifact.
+   */
+  fun associativeConceptCandidates(
+    seedArtifactIds: List<String>,
+    limit: Int,
+  ): List<IndexedRecallCandidate> {
+    val seeds = seedArtifactIds.distinct().take(MAX_ASSOCIATIVE_SEEDS)
+    if (seeds.isEmpty()) return emptyList()
+    val safeLimit = limit.coerceIn(1, MAX_ASSOCIATIVE_CANDIDATES)
+    val placeholders = seeds.joinToString(",") { "?" }
+    return queryRecallCandidates(
+      sql =
+        """
+        WITH seed_concepts AS (
+          SELECT concept_id, MAX(weight) AS seed_weight
+          FROM artifact_concepts
+          WHERE artifact_id IN ($placeholders)
+          GROUP BY concept_id
+        ),
+        neighbor_concepts AS (
+          SELECT
+            CASE
+              WHEN ce.source_concept_id = sc.concept_id THEN ce.target_concept_id
+              ELSE ce.source_concept_id
+            END AS concept_id,
+            SUM(ce.strength * sc.seed_weight) AS graph_score
+          FROM seed_concepts sc
+          JOIN concept_edges ce
+            ON ce.source_concept_id = sc.concept_id OR ce.target_concept_id = sc.concept_id
+          GROUP BY
+            CASE
+              WHEN ce.source_concept_id = sc.concept_id THEN ce.target_concept_id
+              ELSE ce.source_concept_id
+            END
+        )
+        SELECT a.artifact_id, a.exchange_id, e.session_id, a.source_kind,
+               e.captured_at_ms, a.content_sha256, a.markdown_location, a.document_sha256,
+               a.recall_terms, a.durable_personal_score
+        FROM neighbor_concepts nc
+        JOIN artifact_concepts ac ON ac.concept_id = nc.concept_id
+        JOIN artifacts a ON a.artifact_id = ac.artifact_id
+        JOIN exchanges e ON e.exchange_id = a.exchange_id
+        WHERE a.artifact_id NOT IN ($placeholders)
+          AND a.verified = 1 AND e.verified = 1
+          AND a.retrieval_eligible = 1 AND a.memory_state = 'active'
+        GROUP BY a.artifact_id
+        ORDER BY SUM(nc.graph_score * ac.weight) DESC, e.captured_at_ms DESC
+        LIMIT ?
+        """.trimIndent(),
+      args = (seeds + seeds + safeLimit.toString()).toTypedArray(),
+    )
   }
 
   fun recordRetrieval(
@@ -479,6 +656,167 @@ internal class CortexIndexDatabase(context: Context) :
     )
   }
 
+  private fun createCognitiveTables(db: SQLiteDatabase) {
+    db.execSQL(
+      """
+      CREATE TABLE IF NOT EXISTS concepts (
+        concept_id TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        normalized_label TEXT NOT NULL UNIQUE,
+        concept_type TEXT NOT NULL,
+        origin_class TEXT NOT NULL DEFAULT 'derived_index',
+        origin_trust TEXT NOT NULL DEFAULT 'derived',
+        authority_ceiling TEXT NOT NULL DEFAULT 'inform_only',
+        privacy_scope TEXT NOT NULL DEFAULT 'general',
+        disclosure_policy TEXT NOT NULL DEFAULT 'safe_with_user',
+        created_at_ms INTEGER NOT NULL,
+        updated_at_ms INTEGER NOT NULL
+      )
+      """.trimIndent()
+    )
+    db.execSQL(
+      """
+      CREATE TABLE IF NOT EXISTS artifact_concepts (
+        artifact_id TEXT NOT NULL REFERENCES artifacts(artifact_id) ON DELETE CASCADE,
+        concept_id TEXT NOT NULL REFERENCES concepts(concept_id) ON DELETE CASCADE,
+        weight REAL NOT NULL,
+        provenance TEXT NOT NULL DEFAULT 'DERIVED_LEXICAL',
+        confirmation_status TEXT NOT NULL DEFAULT 'UNCONFIRMED',
+        PRIMARY KEY (artifact_id, concept_id)
+      )
+      """.trimIndent()
+    )
+    db.execSQL(
+      """
+      CREATE TABLE IF NOT EXISTS concept_edges (
+        source_concept_id TEXT NOT NULL REFERENCES concepts(concept_id) ON DELETE CASCADE,
+        target_concept_id TEXT NOT NULL REFERENCES concepts(concept_id) ON DELETE CASCADE,
+        relation_type TEXT NOT NULL DEFAULT 'co_occurs_with',
+        strength REAL NOT NULL,
+        confidence REAL NOT NULL,
+        support_count INTEGER NOT NULL,
+        source_kind TEXT NOT NULL DEFAULT 'MODEL_INFERRED',
+        confirmation_status TEXT NOT NULL DEFAULT 'UNCONFIRMED',
+        authority_ceiling TEXT NOT NULL DEFAULT 'inform_only',
+        updated_at_ms INTEGER NOT NULL,
+        PRIMARY KEY (source_concept_id, target_concept_id, relation_type)
+      )
+      """.trimIndent()
+    )
+    db.execSQL(
+      "CREATE INDEX IF NOT EXISTS idx_artifact_concepts_concept ON artifact_concepts(concept_id)"
+    )
+    db.execSQL(
+      "CREATE INDEX IF NOT EXISTS idx_concept_edges_target ON concept_edges(target_concept_id)"
+    )
+  }
+
+  private fun indexCognitiveMetadata(
+    db: SQLiteDatabase,
+    artifactId: String,
+    conceptTerms: List<String>,
+    capturedAtEpochMs: Long,
+  ) {
+    val normalizedConcepts =
+      conceptTerms
+        .map { term ->
+          term
+            .lowercase()
+            .replace(Regex("[^\\p{L}\\p{N}_-]+"), "_")
+            .trim('_', '-')
+        }
+        .filter { term -> term.length in 2..80 }
+        .distinct()
+        .take(MAX_CONCEPTS_PER_ARTIFACT)
+    if (normalizedConcepts.isEmpty()) return
+
+    db.delete("artifact_concepts", "artifact_id = ?", arrayOf(artifactId))
+    val conceptIds =
+      normalizedConcepts.mapIndexed { rank, normalized ->
+        val conceptId = "concept_${CortexHashing.sha256(normalized).take(24)}"
+        db.insertWithOnConflict(
+          "concepts",
+          null,
+          ContentValues().apply {
+            put("concept_id", conceptId)
+            put("label", normalized.replace('_', ' '))
+            put("normalized_label", normalized)
+            put("concept_type", if ('_' in normalized) "phrase" else "lexical")
+            put("origin_class", "derived_index")
+            put("origin_trust", "derived")
+            put("authority_ceiling", "inform_only")
+            put("privacy_scope", "general")
+            put("disclosure_policy", "safe_with_user")
+            put("created_at_ms", capturedAtEpochMs)
+            put("updated_at_ms", capturedAtEpochMs)
+          },
+          SQLiteDatabase.CONFLICT_IGNORE,
+        )
+        db.update(
+          "concepts",
+          ContentValues().apply { put("updated_at_ms", capturedAtEpochMs) },
+          "concept_id = ?",
+          arrayOf(conceptId),
+        )
+        db.insertWithOnConflict(
+          "artifact_concepts",
+          null,
+          ContentValues().apply {
+            put("artifact_id", artifactId)
+            put("concept_id", conceptId)
+            put("weight", (1.0 - rank * 0.035).coerceAtLeast(0.48))
+            put("provenance", "DERIVED_LEXICAL")
+            put("confirmation_status", "UNCONFIRMED")
+          },
+          SQLiteDatabase.CONFLICT_REPLACE,
+        )
+        conceptId
+      }
+
+    conceptIds.sorted().take(MAX_EDGE_CONCEPTS_PER_ARTIFACT).forEachIndexed { leftIndex, left ->
+      conceptIds
+        .sorted()
+        .take(MAX_EDGE_CONCEPTS_PER_ARTIFACT)
+        .drop(leftIndex + 1)
+        .forEach { right ->
+          val support =
+            db.rawQuery(
+                """
+                SELECT support_count FROM concept_edges
+                WHERE source_concept_id = ? AND target_concept_id = ?
+                  AND relation_type = 'co_occurs_with'
+                """.trimIndent(),
+                arrayOf(left, right),
+              )
+              .use { cursor -> if (cursor.moveToFirst()) cursor.getInt(0) else 0 }
+          val newSupport = support + 1
+          val values =
+            ContentValues().apply {
+              put("source_concept_id", left)
+              put("target_concept_id", right)
+              put("relation_type", "co_occurs_with")
+              put("strength", (0.22 + (newSupport - 1).coerceAtMost(7) * 0.08).coerceAtMost(0.78))
+              put("confidence", (0.42 + (newSupport - 1).coerceAtMost(7) * 0.06).coerceAtMost(0.84))
+              put("support_count", newSupport)
+              put("source_kind", "MODEL_INFERRED")
+              put("confirmation_status", "UNCONFIRMED")
+              put("authority_ceiling", "inform_only")
+              put("updated_at_ms", capturedAtEpochMs)
+            }
+          if (support == 0) {
+            db.insertOrThrow("concept_edges", null, values)
+          } else {
+            db.update(
+              "concept_edges",
+              values,
+              "source_concept_id = ? AND target_concept_id = ? AND relation_type = ?",
+              arrayOf(left, right, "co_occurs_with"),
+            )
+          }
+        }
+    }
+  }
+
   private fun queryRecallCandidates(
     sql: String,
     args: Array<String>,
@@ -496,6 +834,8 @@ internal class CortexIndexDatabase(context: Context) :
               contentHash = cursor.getString(5),
               markdownLocation = cursor.getString(6),
               documentHash = cursor.getString(7),
+              recallTerms = cursor.getString(8),
+              durablePersonalScore = cursor.getInt(9),
             )
           )
         }
@@ -504,13 +844,17 @@ internal class CortexIndexDatabase(context: Context) :
 
   private companion object {
     const val DATABASE_NAME = "jarvis_alpha_cortex.db"
-    const val DATABASE_VERSION = 4
+    const val DATABASE_VERSION = 5
     const val MAX_RECALL_CANDIDATES = 64
     const val MAX_INDEX_BACKFILL_BATCH = 256
     const val MAX_DURABLE_PERSONAL_CHARS = 8_000
     const val MAX_SYNTHESIS_DURABLE_SEEDS = 16
     const val MAX_SYNTHESIS_LEXICAL_SEEDS = 40
     const val MAX_SEEDS_PER_TERM = 8
+    const val MAX_ASSOCIATIVE_SEEDS = 12
+    const val MAX_ASSOCIATIVE_CANDIDATES = 16
+    const val MAX_CONCEPTS_PER_ARTIFACT = 16
+    const val MAX_EDGE_CONCEPTS_PER_ARTIFACT = 12
     val SAFE_SEARCH_TERM = Regex("^[\\p{L}\\p{N}_-]{2,64}$")
   }
 }

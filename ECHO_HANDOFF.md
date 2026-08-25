@@ -4,6 +4,10 @@
 
 Native Cortex recall and multi-memory synthesis now work in the installed Jarvis Alpha app.
 
+This stage also adds and verifies the first native ThreadKeeper 4.0.1 schema-13 cognitive field:
+persistent concepts/links, associative expansion, memory physics, memory handles, governance
+metadata, bounded DMR, and auditable receipts.
+
 The decisive user-visible tests were run from fresh chats on the connected phone:
 
 - `Tell me something about me from the memory test`
@@ -24,25 +28,49 @@ The decisive user-visible tests were run from fresh chats on the connected phone
 
 No `FATAL EXCEPTION` or `AndroidRuntime` crash appeared in the test logs.
 
+The final live-vault proof used:
+
+- `Across our conversations, synthesize how Infinite Workshop, Jarvis autonomy, and helping
+  people fit together. Separate memory and inference.`
+- Jarvis visibly produced a rich cross-memory synthesis, distinguished explicit statements from
+  its inference, and correctly treated prior assistant synthesis as useful formulation rather than
+  independent evidence.
+- Logcat confirmed 48 direct candidates, 16 persistent associative candidates, 61 verified exact
+  artifacts available to the field, a bounded 36-memory field, all 3 physics ticks, no degradation,
+  40.56 ms operation time, 5 surfaced artifacts, retrieval receipt
+  `0efc12f4-c9b2-4c28-966d-2714586ea7cf`, and verified capture
+  `00c0172b-3993-47ef-80e5-621e31ac3870`.
+
 ## Files changed
 
 - `Android/src/app/src/alpha/java/com/google/ai/edge/gallery/cortex/AlphaCortexRuntime.kt`
   - Indexes new captures, repairs old derived metadata in the background and on demand, queries the
     whole-vault candidate field, verifies Markdown before recall, and writes retrieval receipts.
 - `Android/src/app/src/alpha/java/com/google/ai/edge/gallery/cortex/CortexIndexDatabase.kt`
-  - Adds the version-4 derived FTS index, durable-personal metadata, versioned rebuild, cue-by-cue
-    retrieval, synthesis seeds, associative session expansion, and hard candidate bounds.
+  - Upgrades the disposable index to version 5 with governance metadata, persistent concepts,
+    artifact-concept memberships, inferred co-occurrence edges, background graph rebuild, bounded
+    concept expansion, and precomputed navigation metadata.
+- `Android/src/app/src/alpha/java/com/google/ai/edge/gallery/cortex/CortexCognitiveField.kt`
+  - Implements bounded direct activation, two-hop spread, gravity/affinity/cohesion/repulsion/
+    resonance/inertia/decay ticks, nearest-neighbor handles, deterministic tracing, hard bounds,
+    and soft-budget degradation.
 - `Android/src/app/src/alpha/java/com/google/ai/edge/gallery/cortex/CortexRecallEngine.kt`
-  - Adds focused, broad, and synthesis intents; provenance-aware routing; document-dump rejection;
-    session diversity; near-duplicate suppression; and bounded exact/excerpt rendering.
+  - Adds concept extraction, physics-aware selection, provenance-aware memory handles, explicit
+    authority/truth boundaries, and schema-13 model context on top of existing recall intents.
+- `Android/src/app/src/alpha/java/com/google/ai/edge/gallery/cortex/CortexMarkdownCodec.kt`
+  - Writes schema-13 retrieval receipts with bounds, intent, force values, LODs, tick trace,
+    timing, degraded status, and the epistemic invariant.
 - `Android/src/app/src/main/java/com/google/ai/edge/gallery/cortex/CortexRuntime.kt`
   - Sets the default surfaced-memory and context bounds used by the native runtime.
 - `Android/src/app/src/testAlpha/java/com/google/ai/edge/gallery/cortex/CortexRecallEngineTest.kt`
   - Adds regressions for the real memory-test wording, pasted-document rejection, and diverse
     cross-conversation synthesis/detail levels.
 - `Android/src/app/src/androidTestAlpha/java/com/google/ai/edge/gallery/cortex/AlphaCortexDeviceTest.kt`
-  - Verifies exact Markdown capture, same-session recall, fresh-chat recall, multiple memory
-    captures, synthesis retrieval, receipts, and persistence after reopening the index.
+  - Also verifies schema-13 receipt fields, populated concepts/links, completed indexing, and
+    inform-only authority on a real Android SQLite runtime.
+- `Android/src/app/src/testAlpha/java/com/google/ai/edge/gallery/cortex/CortexCognitiveFieldTest.kt`
+  - Verifies hard bounds, deterministic spread/physics/DMR, memory handles, nearest relations, and
+    schema-13 receipt output.
 - `ECHO_BRIEF.md`
   - Records permanent decisions, requirements, discoveries, and the next native schema-13 stage.
 - `ECHO_HANDOFF.md`
@@ -60,7 +88,9 @@ added, modified intentionally, or removed.
 - Installed `app-alpha-androidTest.apk`: `Success`.
 - Ran `AlphaCortexDeviceTest` through AndroidJUnitRunner:
   - `OK (1 test)`
-  - final test time `0.163s`.
+  - final test time `0.294s`.
+  - all four recall cycles ran 3 ticks without degradation; the two focused recall paths each
+    proved a persistent associative neighbor (`direct=1, associative=1`).
 - Restarted Alpha without clearing app data and performed both tests through the real Compose chat
   UI using OpenAI GPT-5.6 Medium.
 
@@ -70,14 +100,16 @@ added, modified intentionally, or removed.
 - `C:\Users\Billy\.codex\.chatgpt-projects\g-p-6a42f6e4b6e08191b645e1e0a94d00fc\tk-live-synthesis-stable.png`
 - `C:\Users\Billy\.codex\.chatgpt-projects\g-p-6a42f6e4b6e08191b645e1e0a94d00fc\tk-live-synthesis-lower.png`
 - `C:\Users\Billy\.codex\.chatgpt-projects\g-p-6a42f6e4b6e08191b645e1e0a94d00fc\tk-live-synthesis-inference.png`
+- `C:\Users\Billy\.codex\.chatgpt-projects\g-p-6a42f6e4b6e08191b645e1e0a94d00fc\jarvis-schema13-optimized.png`
 
 ## Known limits and unresolved work
 
-- Background maintenance currently rebuilds derived search metadata. It does not yet create
+- Background maintenance rebuilds search and concept/link metadata but does not yet create
   versioned normalized Markdown sidecars for arbitrary old/unstructured sources.
-- Selection uses deterministic lexical cues and heuristics; embeddings, typed concept links,
-  graph geometry, memory physics ticks, and learned routing are not yet native.
-- `EXACT_EXCERPT` is the first safe LoD mechanism, not full Matryoshka vector LoD.
+- Current links are lexical phrase/concept co-occurrences. Rich typed semantic, causal, temporal,
+  correction, and contradiction edges with validity intervals are not yet native.
+- Memory physics is a deterministic bounded navigation field, not yet a learned geometry.
+- `EXACT_EXCERPT` is safe initial DMR, not full summary ladders or Matryoshka vector LoD.
 - The imported ThreadKeeper schema-11 copy remains archival; schema-13 typed collections are not
   yet mapped into live native modules.
 - Contradiction resolution, temporal validity, reconsolidation, policies, routines, outcomes, and
@@ -85,7 +117,6 @@ added, modified intentionally, or removed.
 
 ## Recommended next step
 
-Preserve this working recall baseline, then add the schema-13 concept/link/temporal store and an
-idempotent background normalizer that writes versioned Markdown sidecars and receipts. Feed its
-bounded associative spread into the existing synthesis candidate field before adding embeddings or
-more UI.
+Preserve this working schema-13 hot path, then add the idempotent background normalizer and
+versioned Markdown sidecars/receipts. Next enrich links with semantic type, temporal validity,
+contradiction/supersession, and explicit supporting evidence before adding embeddings.

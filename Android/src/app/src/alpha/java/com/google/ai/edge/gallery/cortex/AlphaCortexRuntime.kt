@@ -41,6 +41,7 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
   private val appContext = context.applicationContext ?: context
   private val vault = CortexVault(appContext)
   private val index = CortexIndexDatabase(appContext)
+  private val cognitiveField = CortexCognitiveField()
   private val mutationMutex = Mutex()
   private val maintenanceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val _status = MutableStateFlow(readStatus("Ready", healthy = true))
@@ -163,6 +164,7 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
                   documentHash = userDocument.documentSha256,
                   recallTerms = userRecallMetadata.normalizedTerms,
                   durablePersonalScore = userRecallMetadata.durablePersonalScore,
+                  conceptTerms = userRecallMetadata.conceptTerms,
                 ),
                 IndexedArtifact(
                   artifactId = assistantArtifactId,
@@ -173,6 +175,7 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
                   documentHash = assistantDocument.documentSha256,
                   recallTerms = assistantRecallMetadata.normalizedTerms,
                   durablePersonalScore = assistantRecallMetadata.durablePersonalScore,
+                  conceptTerms = assistantRecallMetadata.conceptTerms,
                 ),
               ),
           )
@@ -206,12 +209,22 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
           val maxArtifacts = request.maxArtifacts.coerceIn(1, 8)
           val maxContextChars = request.maxContextChars.coerceIn(1_000, 5_200)
           backfillRecallIndex()
-          val indexedCandidates =
+          val recallIntent = CortexRecallEngine.recallIntent(request.query)
+          val directCandidates =
             index.recallCandidates(
               queryTerms = CortexRecallEngine.normalizedQueryTerms(request.query),
-              intent = CortexRecallEngine.recallIntent(request.query),
-              limit = 64,
+              intent = recallIntent,
+              limit = 48,
             )
+          val associativeCandidates =
+            index.associativeConceptCandidates(
+              seedArtifactIds = directCandidates.take(12).map(IndexedRecallCandidate::artifactId),
+              limit = 16,
+            )
+          val indexedCandidates =
+            (directCandidates + associativeCandidates)
+              .distinctBy(IndexedRecallCandidate::artifactId)
+              .take(64)
           val readableCandidates =
             indexedCandidates.mapNotNull { candidate ->
               runCatching {
@@ -228,16 +241,38 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
                     sourceKind = candidate.sourceKind,
                     capturedAtEpochMs = candidate.capturedAtEpochMs,
                     exactContent = exactBytes.toString(Charsets.UTF_8),
+                    indexedTerms =
+                      candidate.recallTerms
+                        .splitToSequence(' ')
+                        .filter(String::isNotBlank)
+                        .take(256)
+                        .toSet(),
+                    indexedDurablePersonalScore = candidate.durablePersonalScore,
                   )
                 }
                 .getOrNull()
             }
+          val field =
+            cognitiveField.activate(
+              query = request.query,
+              candidates = readableCandidates,
+              intent = recallIntent,
+              requestedArtifacts = maxArtifacts,
+              requestedContextChars = maxContextChars,
+            )
+          Log.i(
+            TAG,
+            "Cortex schema-13 field: direct=${directCandidates.size}, " +
+              "associative=${associativeCandidates.size}, verified=${readableCandidates.size}, " +
+              "spread=${field.spreadCandidateCount}, ticks=${field.trace.size}, " +
+              "degraded=${field.degraded}, ms=${"%.2f".format(field.operationMs)}",
+          )
           val selected =
             CortexRecallEngine.select(
-              candidatesNewestFirst = readableCandidates,
+              candidatesNewestFirst = field.candidates,
               query = request.query,
-              maxArtifacts = maxArtifacts,
-              maxContextChars = maxContextChars,
+              maxArtifacts = field.profile.outputMemories,
+              maxContextChars = field.profile.modelContextChars,
             )
           if (selected.isEmpty()) {
             return@withLock CortexRecallPacket(
@@ -257,7 +292,9 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
               sessionId = request.currentSessionId,
               queryHash = queryHash,
               recalledAtEpochMs = recalledAt,
-              candidateCount = readableCandidates.size,
+              candidateCount = field.candidates.size,
+              intent = recallIntent,
+              field = field,
               selected = selected,
             )
           val receipt =
@@ -280,13 +317,18 @@ class AlphaCortexRuntime private constructor(context: Context) : CortexRuntime {
             artifactIdsJson = artifactIdsJson,
           )
           _status.value =
-            readStatus("Last recall verified (${selected.size} artifacts)", healthy = true)
+            readStatus(
+              "Last recall verified (${selected.size} artifacts, ${field.profile.ticks} ticks)",
+              healthy = true,
+            )
           CortexRecallPacket(
             contextForModel = CortexRecallEngine.buildModelContext(selected),
             artifactIds = artifactIds,
             receiptId = receiptId,
             verified = true,
-            message = "Verified native Cortex memory-cycle retrieval.",
+            message =
+              "Verified native Cortex memory cycle: ${field.directSeedCount} direct, " +
+                "${field.spreadCandidateCount} spread, ${field.profile.ticks} physics ticks.",
           )
         } catch (error: Exception) {
           val message = error.message ?: "Cortex recall failed."

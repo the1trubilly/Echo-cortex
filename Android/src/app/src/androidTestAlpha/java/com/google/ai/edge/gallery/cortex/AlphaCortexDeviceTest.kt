@@ -145,8 +145,13 @@ class AlphaCortexDeviceTest {
       retrievalDirectory.listFiles().orEmpty().filter { file -> file.name !in retrievalNamesBefore }
     assertEquals(4, retrievalFiles.size)
     retrievalFiles.forEach { file ->
-      assertTrue("document_type: memory_cycle_retrieval_receipt" in file.readText())
-      assertTrue("verified: true" in file.readText())
+      val receiptText = file.readText()
+      assertTrue("document_type: memory_cycle_retrieval_receipt" in receiptText)
+      assertTrue("threadkeeper_schema: 13" in receiptText)
+      assertTrue("authority_ceiling: inform_only" in receiptText)
+      assertTrue("physics_ticks: 3" in receiptText)
+      assertTrue("## Bounded physics trace" in receiptText)
+      assertTrue("verified: true" in receiptText)
     }
 
     val after = runtime.status.value
@@ -158,10 +163,26 @@ class AlphaCortexDeviceTest {
       assertEquals(after.verifiedExchanges, reopenedIndex.counts().exchanges)
       assertEquals(after.verifiedArtifacts, reopenedIndex.counts().artifacts)
       assertEquals(after.verifiedRecalls, reopenedIndex.counts().retrievals)
+      val db = reopenedIndex.readableDatabase
+      assertTrue(countRows(db, "concepts") > 0)
+      assertTrue(countRows(db, "artifact_concepts") >= after.verifiedArtifacts)
+      assertTrue(countRows(db, "concept_edges") > 0)
+      assertEquals(0, countRows(db, "artifacts", "cognitive_indexed = 0"))
+      assertEquals(0, countRows(db, "artifacts", "authority_ceiling != 'inform_only'"))
     } finally {
       reopenedIndex.close()
     }
   }
+
+  private fun countRows(db: SQLiteDatabase, table: String, where: String? = null): Int =
+    db.rawQuery(
+        "SELECT COUNT(*) FROM $table${if (where == null) "" else " WHERE $where"}",
+        null,
+      )
+      .use { cursor ->
+        cursor.moveToFirst()
+        cursor.getInt(0)
+      }
 
   private class TemporaryCortexContext(base: Context) : ContextWrapper(base) {
     private val identifier = UUID.randomUUID().toString()

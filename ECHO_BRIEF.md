@@ -6,8 +6,9 @@ Jarvis Alpha has a working native Cortex memory path. A fresh chat can recall ve
 older conversations and can assemble a bounded, multi-memory synthesis packet. The user-visible
 acceptance tests passed on the connected phone on 2026-08-24.
 
-This is the first working skeleton of ThreadKeeper 4.0.1's normal hot path, not the complete
-schema-13 cognitive engine.
+This now includes a native schema-13 cognitive-field skeleton from ThreadKeeper 4.0.1: persistent
+concept/link navigation, bounded associative expansion, memory physics, auditable memory handles,
+and safe exact/excerpt DMR. It is not yet the complete cognitive engine.
 
 ## Permanent architecture decisions
 
@@ -22,7 +23,9 @@ schema-13 cognitive engine.
 - Retrieval stays bounded: at most 64 local candidates, 8 surfaced artifacts, and 5,200 rendered
   context characters.
 - Exact source remains epistemically authoritative. Search score, recency, geometry, activation,
-  and future memory physics may route attention but may not manufacture truth.
+  and memory physics may route attention but may not manufacture truth.
+- Derived concepts and links have an `inform_only` authority ceiling. They remain unconfirmed,
+  rebuildable index data and never become independent corroboration of a memory.
 - Legacy-index maintenance is incremental and non-destructive. It verifies old Markdown and
   rebuilds derived metadata in the background; it does not rewrite canonical memories.
 
@@ -44,6 +47,25 @@ schema-13 cognitive engine.
    source text plus an explicit omission marker; no summary is fabricated.
 9. A model-facing memory packet that labels source, detail level, reason surfaced, and the boundary
    between remembered evidence and inference.
+
+## Native schema-13 cognitive field now present
+
+1. SQLite index version 5 stores explicit origin, trust, authority, privacy, disclosure,
+   quarantine, eligibility, memory-state, observed-time, and recorded-time metadata.
+2. Captures and verified legacy Markdown are indexed into bounded lexical/phrase concepts.
+3. Concept co-occurrence links form a persistent, rebuildable lattice. Links are marked
+   `MODEL_INFERRED`, `UNCONFIRMED`, and `inform_only`.
+4. Direct candidates expand through the persistent concept lattice before exact Markdown is read
+   and hash-verified.
+5. A 36-memory local field performs two-hop fanout-3 spread and three deterministic physics ticks
+   using gravity, affinity, cohesion, repulsion, resonance, inertia, and decay.
+6. Each surfaced memory includes activation, mass, force summary, navigation basis, nearest
+   related memories, available detail levels, truth source, and epistemic boundary.
+7. Schema-13 retrieval receipts record the intent, bounds, direct/spread counts, tick trace,
+   degraded state, timing, selected LODs, and inform-only invariant.
+8. The hot path reuses precomputed derived terms while still reading and hash-verifying exact
+   Markdown before model injection. On Billy's live vault the verified synthesis cycle completed
+   all three ticks in 40.56 ms without degradation.
 
 ## Non-negotiable product requirements
 
@@ -74,15 +96,16 @@ schema-13 cognitive engine.
 
 ## Next architectural milestone
 
-Turn the working recall skeleton into explicit schema-13 native modules:
+Build upward from the verified schema-13 hot path:
 
 1. Versioned Markdown sidecars and idempotent migration receipts for old/unstructured material.
-2. Typed concepts and links with provenance, temporal validity, confidence, and contradiction
-   handling.
-3. Bounded associative spread and memory-physics ticks over the local candidate field.
-4. Durable multi-resolution summaries/embeddings while retaining exact Markdown as truth.
-5. DMR packet assembly with auditable detail-level selection.
-6. Lifecycle, reconsolidation, open loops, policies, routines, outcomes, and health/recovery UI.
+2. Typed semantic/causal/temporal/contradiction links with validity windows and evidence support.
+3. Durable multi-resolution summaries and Matryoshka embeddings while retaining exact Markdown as
+   truth and preventing lossy summaries from becoming canonical.
+4. Lifecycle and reconsolidation machinery: supersession, contradiction review, open loops,
+   policies, routines, outcomes, and worldline/genealogy boundaries.
+5. Health, recovery, graph inspection, and receipt inspection UI that stays understandable to a
+   non-technical user.
 
 Do not attempt all of these in one unverified rewrite. Preserve the now-working user-visible recall
 path after every stage.

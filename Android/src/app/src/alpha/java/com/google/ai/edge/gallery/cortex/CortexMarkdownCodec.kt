@@ -160,11 +160,13 @@ internal object CortexMarkdownCodec {
     queryHash: String,
     recalledAtEpochMs: Long,
     candidateCount: Int,
+    intent: CortexRecallIntent,
+    field: CortexCognitiveFieldResult,
     selected: List<SelectedRecallArtifact>,
   ): ByteArray =
     buildString {
         appendLine("---")
-        appendLine("threadkeeper_schema: 11")
+        appendLine("threadkeeper_schema: 13")
         appendLine("document_type: memory_cycle_retrieval_receipt")
         appendLine("receipt_id: ${yaml(receiptId)}")
         appendLine("session_id: ${yaml(sessionId)}")
@@ -172,10 +174,16 @@ internal object CortexMarkdownCodec {
         appendLine("recalled_at: ${yaml(Instant.ofEpochMilli(recalledAtEpochMs).toString())}")
         appendLine("candidate_count: $candidateCount")
         appendLine("selected_count: ${selected.size}")
+        appendLine("retrieval_intent: ${intent.name.lowercase()}")
+        appendLine("physics_candidate_pool: ${field.profile.candidatePool}")
+        appendLine("physics_ticks: ${field.profile.ticks}")
+        appendLine("physics_degraded: ${field.degraded}")
+        appendLine("physics_operation_ms: ${field.operationMs}")
+        appendLine("authority_ceiling: inform_only")
         appendLine("verified: true")
         appendLine("---")
         appendLine()
-        appendLine("# Native Cortex retrieval receipt")
+        appendLine("# Native Cortex schema-13 retrieval receipt")
         appendLine()
         appendLine("This receipt records why bounded memory artifacts surfaced. Retrieval is navigation")
         appendLine("evidence only; frequency and activation never promote a claim's truth status.")
@@ -183,9 +191,29 @@ internal object CortexMarkdownCodec {
         selected.forEachIndexed { index, artifact ->
           appendLine(
             "${index + 1}. `${artifact.candidate.artifactId}` | " +
-              "`${artifact.candidate.sourceKind.name}` | ${artifact.whySurfaced}"
+              "`${artifact.candidate.sourceKind.name}` | lod `${artifact.detailLevel}` | " +
+              "activation `${artifact.candidate.physicsActivation}` | " +
+              "mass `${artifact.candidate.physicsMass}` | ${artifact.whySurfaced}"
+          )
+          appendLine("   - forces: ${artifact.candidate.forceSummary}")
+          appendLine("   - authority: inform_only")
+        }
+        appendLine()
+        appendLine("## Bounded physics trace")
+        appendLine()
+        field.trace.forEach { tick ->
+          appendLine(
+            "- tick ${tick.tick}: " +
+              tick.top.joinToString(" | ") { (artifactId, activation) ->
+                "`${artifactId.take(12)}`=$activation"
+              }
           )
         }
+        appendLine()
+        appendLine(
+          "Activation, mass, spread, and forces are navigation facts only; they do not change " +
+            "truth, confirmation, privacy, authority, or permission."
+        )
       }
       .toByteArray(StandardCharsets.UTF_8)
 
