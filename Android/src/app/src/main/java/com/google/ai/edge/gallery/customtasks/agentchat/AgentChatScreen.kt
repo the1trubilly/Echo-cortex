@@ -124,6 +124,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import org.json.JSONObject
 
 private const val TAG = "AGAgentChatScreen"
+private const val GLOBAL_TOOL_ACTION_HOST_ENABLED = true
 private val chatViewJavascriptInterface = ChatWebViewJavascriptInterface()
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -241,6 +242,162 @@ fun AgentChatScreen(
     }
   }
 
+  // Keep the action host at the screen level. The embedded tool panel can be lazily disposed when
+  // it scrolls off-screen, but permission prompts and result delivery must remain available for the
+  // entire chat turn.
+  val actionChannel = agentTools.receiveActionChannel
+  val doneIcon = ImageVector.vectorResource(R.drawable.skill)
+  val currentActionModel by androidx.compose.runtime.rememberUpdatedState(selectedModel)
+  LaunchedEffect(actionChannel) {
+    for (action in actionChannel) {
+      Log.d(TAG, "Handling action: $action")
+      when (action) {
+        is SkillProgressToolAction -> {
+          viewModel.updateCollapsableProgressPanelMessage(
+            model = currentActionModel,
+            title = action.label,
+            inProgress = action.inProgress,
+            doneIcon = doneIcon,
+            addItemTitle = action.addItemTitle,
+            addItemDescription = action.addItemDescription,
+            customData = action.customData,
+          )
+        }
+        is CallJsToolAction -> {
+          val skillName =
+            if (action.url.contains("/skills/")) {
+              action.url.substringAfter("/skills/").substringBefore("/")
+            } else if (action.url.startsWith(LOCAL_URL_BASE + "/")) {
+              action.url.substringAfter(LOCAL_URL_BASE + "/").substringBefore("/")
+            } else {
+              action.url
+            }
+          val skill = skillManagerViewModel.getSkill(name = skillName)
+          val skillId = skill?.let { skillManagerViewModel.getSkillShortId(it) } ?: "xxxx"
+          try {
+            launch {
+              delay(60000L)
+              if (!action.result.isCompleted) {
+                Log.e(TAG, "JS Execution timed out, completing with error.")
+                Log.d(
+                  TAG,
+                  "Analytics: skill_execution, capability_name=${task.id}, skill_name=$skillName, success=false, error_type=timeout",
+                )
+                firebaseAnalytics?.logEvent(
+                  GalleryEvent.SKILL_EXECUTION.id,
+                  Bundle().apply {
+                    putString("capability_name", task.id)
+                    putString("skill_name", skillName)
+                    putString("skill_id", skillId)
+                    putBoolean("success", false)
+                    putString("error_type", "timeout")
+                  },
+                )
+                action.result.complete(
+                  "{\"error\": \"Skill execution timed out. Please check network connection.\"}"
+                )
+              }
+            }
+
+            suspendCancellableCoroutine<Unit> { continuation ->
+              chatWebViewClient.setPageLoadListener {
+                chatWebViewClient.setPageLoadListener(null)
+                continuation.resume(Unit)
+              }
+              Log.d(TAG, "Loading url: ${action.url}")
+              webViewRef?.loadUrl(action.url)
+            }
+
+            Log.d(TAG, "Start to run js")
+            chatViewJavascriptInterface.onResultListener = { result ->
+              Log.d(TAG, "Got result:\n$result")
+              action.result.complete(result)
+              val isSuccess = !result.contains("\"error\":")
+              val errorType = if (isSuccess) "" else "js_error"
+              Log.d(
+                TAG,
+                "Analytics: skill_execution, capability_name=${task.id}, skill_name=$skillName, success=$isSuccess, error_type=$errorType",
+              )
+              firebaseAnalytics?.logEvent(
+                GalleryEvent.SKILL_EXECUTION.id,
+                Bundle().apply {
+                  putString("capability_name", task.id)
+                  putString("skill_name", skillName)
+                  putString("skill_id", skillId)
+                  putBoolean("success", isSuccess)
+                  putString("error_type", errorType)
+                },
+              )
+            }
+
+            val safeData = JSONObject.quote(action.data)
+            val safeSecret = JSONObject.quote(action.secret)
+            val script =
+              """
+              (async function() {
+                  var startTs = Date.now();
+                  while(true) {
+                    if (typeof ai_edge_gallery_get_result === 'function') {
+                      break;
+                    }
+                    await new Promise(resolve=>{
+                      setTimeout(resolve, 100)
+                    });
+                    if (Date.now() - startTs > 10000) {
+                      break;
+                    }
+                  }
+                  var result = await ai_edge_gallery_get_result($safeData, $safeSecret);
+                  AiEdgeGallery.onResultReady(result);
+              })()
+              """
+                .trimIndent()
+            webViewRef?.evaluateJavascript(script, null)
+          } catch (e: Exception) {
+            Log.d(
+              TAG,
+              "Analytics: skill_execution, capability_name=${task.id}, skill_name=$skillName, success=false, error_type=exception",
+            )
+            firebaseAnalytics?.logEvent(
+              GalleryEvent.SKILL_EXECUTION.id,
+              Bundle().apply {
+                putString("capability_name", task.id)
+                putString("skill_name", skillName)
+                putString("skill_id", skillId)
+                putBoolean("success", false)
+                putString("error_type", "exception")
+              },
+            )
+            action.result.completeExceptionally(e)
+          }
+        }
+        is AskInfoToolAction -> {
+          currentAskInfoAction = action
+          askInfoInputValue = ""
+          showAskInfoDialog = true
+        }
+        is RequestPermissionToolAction -> {
+          currentPermissionAction = action
+          permissionLauncher.launch(action.permission)
+        }
+        is AskMcpToolCallPermissionAction -> currentMcpPermissionAction = action
+        is AskSensitiveToolCallPermissionAction -> currentSensitivePermissionAction = action
+        is PublishToolImageAction -> {
+          agentTools.resultImageToShow =
+            com.google.ai.edge.gallery.tools.CallJsSkillResultImage(base64 = action.base64)
+          viewModel.updateCollapsableProgressPanelMessage(
+            model = currentActionModel,
+            title = "Screenshot captured",
+            inProgress = false,
+            doneIcon = doneIcon,
+            addItemTitle = "Visual test evidence",
+            addItemDescription = action.caption,
+          )
+        }
+      }
+    }
+  }
+
   LlmChatScreen(
     modelManagerViewModel = modelManagerViewModel,
     taskId = BuiltInTaskId.LLM_AGENT_CHAT,
@@ -335,6 +492,7 @@ fun AgentChatScreen(
       // latest active model when the model is switched during an ongoing skill execution.
       val currentModel by androidx.compose.runtime.rememberUpdatedState(model)
       LaunchedEffect(actionChannel) {
+        if (GLOBAL_TOOL_ACTION_HOST_ENABLED) return@LaunchedEffect
         for (action in actionChannel) {
           Log.d(TAG, "Handling action: $action")
           when (action) {
@@ -530,7 +688,7 @@ fun AgentChatScreen(
       // Tool actions are collected from this subcomposition. Render their approval surfaces in
       // the same scope so a request cannot be stranded if the surrounding chat screen is skipped
       // while generation is in progress.
-      currentMcpPermissionAction?.let { action ->
+      if (!GLOBAL_TOOL_ACTION_HOST_ENABLED) currentMcpPermissionAction?.let { action ->
         McpToolCallPermissionDialog(
           toolName = action.toolName,
           argument = action.argument,
@@ -554,7 +712,7 @@ fun AgentChatScreen(
         )
       }
 
-      currentSensitivePermissionAction?.let { action ->
+      if (!GLOBAL_TOOL_ACTION_HOST_ENABLED) currentSensitivePermissionAction?.let { action ->
         SensitiveToolCallPermissionDialog(
           toolName = action.toolName,
           command = action.command,
@@ -699,6 +857,41 @@ fun AgentChatScreen(
         action.result.complete("")
         showAskInfoDialog = false
         currentAskInfoAction = null
+      },
+    )
+  }
+
+  currentMcpPermissionAction?.let { action ->
+    McpToolCallPermissionDialog(
+      toolName = action.toolName,
+      argument = action.argument,
+      onResult = { result ->
+        action.result.complete(result)
+        if (result == PermissionResult.ALWAYS_ALLOW) {
+          val serverState =
+            mcpManagerViewModel.uiState.value.mcpServers.find { serverState ->
+              serverState.mcpServer.toolsList.any { it.name == action.toolName }
+            }
+          serverState?.mcpServer?.url?.let { url ->
+            mcpManagerViewModel.setMcpToolAlwaysAllow(
+              url = url,
+              toolName = action.toolName,
+              alwaysAllow = true,
+            )
+          }
+        }
+        currentMcpPermissionAction = null
+      },
+    )
+  }
+
+  currentSensitivePermissionAction?.let { action ->
+    SensitiveToolCallPermissionDialog(
+      toolName = action.toolName,
+      command = action.command,
+      onResult = { result ->
+        action.result.complete(result)
+        currentSensitivePermissionAction = null
       },
     )
   }
