@@ -1216,12 +1216,18 @@ class AndroidCodeOnTheGoBridge(
       runner.run(
           "$adb shell " +
             "${(
-              "jarvis_component=\"\$(cmd package resolve-activity --brief $CODE_ON_THE_GO_PACKAGE | tail -n 1)\"; " +
-                "test -n \"\$jarvis_component\" && am start -W -n \"\$jarvis_component\""
+              "am start -W -n $CODE_ON_THE_GO_PACKAGE/.activities.SplashActivity"
               ).shellSingleQuote()}",
           BRIDGE_STEP_TIMEOUT_MS,
         )
         .requireSuccess("Could not open Code on the Go")
+      pause(CODE_ON_THE_GO_OPEN_DELAY_MS)
+
+      runner.run(
+          "$adb shell ${buildOpenCodeOnTheGoTerminalCommand(paths).shellSingleQuote()}",
+          BRIDGE_STEP_TIMEOUT_MS,
+        )
+        .requireSuccess("Could not open the Code on the Go terminal")
       pause(CODE_ON_THE_GO_OPEN_DELAY_MS)
 
       val sizeResult =
@@ -1234,6 +1240,15 @@ class AndroidCodeOnTheGoBridge(
           BRIDGE_STEP_TIMEOUT_MS,
         )
         .requireSuccess("Could not focus the Code on the Go terminal")
+      pause(TERMINAL_FOCUS_DELAY_MS)
+
+      // A previously interrupted UI-driven command can leave one or more characters at the
+      // prompt. Ctrl+C returns the terminal to a known empty command line before every request.
+      runner.run(
+          "$adb shell ${"input keycombination 113 31".shellSingleQuote()}",
+          BRIDGE_STEP_TIMEOUT_MS,
+        )
+        .requireSuccess("Could not clear the Code on the Go terminal prompt")
       pause(TERMINAL_FOCUS_DELAY_MS)
 
       val typedCommand = "sh%s${paths.script}"
@@ -1310,7 +1325,8 @@ class AndroidCodeOnTheGoBridge(
       }
       if (returnPackageName.matches(ANDROID_PACKAGE_NAME)) {
         val restoreRemote =
-          "am start -W -n $returnPackageName/com.google.ai.edge.gallery.MainActivity >/dev/null 2>&1"
+          "am start --activity-reorder-to-front -W -n " +
+            "$returnPackageName/com.google.ai.edge.gallery.MainActivity >/dev/null 2>&1"
         runner.run("$adb shell ${restoreRemote.shellSingleQuote()}", BRIDGE_STEP_TIMEOUT_MS)
       }
     }
@@ -1511,7 +1527,8 @@ class AndroidCodeOnTheGoBridge(
       errorMessage = error.message ?: "Counterpart prompt test failed."
     } finally {
       val restoreRemote =
-        "am start -W -n $returnPackageName/com.google.ai.edge.gallery.MainActivity >/dev/null 2>&1"
+        "am start --activity-reorder-to-front -W -n " +
+          "$returnPackageName/com.google.ai.edge.gallery.MainActivity >/dev/null 2>&1"
       runner.run("$adb shell ${restoreRemote.shellSingleQuote()}", BRIDGE_STEP_TIMEOUT_MS)
     }
     return JarvisPromptTestResult(
@@ -1623,8 +1640,18 @@ internal data class CodeOnTheGoBridgePaths(val requestId: String) {
   val outputTemporary = "$output.tmp"
   val exit = "$BRIDGE_DIRECTORY/result-$requestId.exit"
   val exitTemporary = "$exit.tmp"
-  val allTransientPaths = listOf(script, output, outputTemporary, exit, exitTemporary)
+  val terminalUi = "$BRIDGE_DIRECTORY/terminal-$requestId.xml"
+  val allTransientPaths = listOf(script, output, outputTemporary, exit, exitTemporary, terminalUi)
 }
+
+/** Uses the visible UI label and its reported bounds instead of device-specific tap coordinates. */
+internal fun buildOpenCodeOnTheGoTerminalCommand(paths: CodeOnTheGoBridgePaths): String =
+  "uiautomator dump ${paths.terminalUi.shellSingleQuote()} >/dev/null && " +
+    "jarvis_bounds=\"\$(grep -o 'text=\"Terminal\"[^>]*bounds=\"\\[[0-9,]*\\]\\[[0-9,]*\\]\"' " +
+    "${paths.terminalUi.shellSingleQuote()} | head -n 1 | grep -o '[0-9][0-9]*' | tr '\\n' ' ')\"; " +
+    "set -- \$jarvis_bounds; " +
+    "if [ \"\$#\" -ne 4 ]; then printf 'Terminal button was not visible.\\n' >&2; exit 73; fi; " +
+    "input tap \$(( (\$1 + \$3) / 2 )) \$(( (\$2 + \$4) / 2 ))"
 
 internal fun buildCodeOnTheGoRequestScript(
   command: String,

@@ -526,6 +526,44 @@ fun AgentChatScreen(
           }
         },
       )
+
+      // Tool actions are collected from this subcomposition. Render their approval surfaces in
+      // the same scope so a request cannot be stranded if the surrounding chat screen is skipped
+      // while generation is in progress.
+      currentMcpPermissionAction?.let { action ->
+        McpToolCallPermissionDialog(
+          toolName = action.toolName,
+          argument = action.argument,
+          onResult = { result ->
+            action.result.complete(result)
+            if (result == PermissionResult.ALWAYS_ALLOW) {
+              val serverState =
+                mcpManagerViewModel.uiState.value.mcpServers.find { serverState ->
+                  serverState.mcpServer.toolsList.any { it.name == action.toolName }
+                }
+              serverState?.mcpServer?.url?.let { url ->
+                mcpManagerViewModel.setMcpToolAlwaysAllow(
+                  url = url,
+                  toolName = action.toolName,
+                  alwaysAllow = true,
+                )
+              }
+            }
+            currentMcpPermissionAction = null
+          },
+        )
+      }
+
+      currentSensitivePermissionAction?.let { action ->
+        SensitiveToolCallPermissionDialog(
+          toolName = action.toolName,
+          command = action.command,
+          onResult = { result ->
+            action.result.complete(result)
+            currentSensitivePermissionAction = null
+          },
+        )
+      }
     },
     allowEditingSystemPrompt = true,
     curSystemPrompt = curSystemPrompt,
@@ -661,43 +699,6 @@ fun AgentChatScreen(
         action.result.complete("")
         showAskInfoDialog = false
         currentAskInfoAction = null
-      },
-    )
-  }
-
-  if (currentMcpPermissionAction != null) {
-    val action = currentMcpPermissionAction!!
-    McpToolCallPermissionDialog(
-      toolName = action.toolName,
-      argument = action.argument,
-      onResult = { result ->
-        action.result.complete(result)
-        if (result == PermissionResult.ALWAYS_ALLOW) {
-          val serverState =
-            mcpManagerViewModel.uiState.value.mcpServers.find { serverState ->
-              serverState.mcpServer.toolsList.any { it.name == action.toolName }
-            }
-          serverState?.mcpServer?.url?.let { url ->
-            mcpManagerViewModel.setMcpToolAlwaysAllow(
-              url = url,
-              toolName = action.toolName,
-              alwaysAllow = true,
-            )
-          }
-        }
-        currentMcpPermissionAction = null
-      },
-    )
-  }
-
-  if (currentSensitivePermissionAction != null) {
-    val action = currentSensitivePermissionAction!!
-    SensitiveToolCallPermissionDialog(
-      toolName = action.toolName,
-      command = action.command,
-      onResult = { result ->
-        action.result.complete(result)
-        currentSensitivePermissionAction = null
       },
     )
   }

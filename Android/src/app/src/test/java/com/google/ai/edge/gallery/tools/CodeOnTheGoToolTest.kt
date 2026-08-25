@@ -158,6 +158,19 @@ class CodeOnTheGoToolTest {
   }
 
   @Test
+  fun terminalNavigationUsesVisibleLabelBounds() {
+    val paths = CodeOnTheGoBridgePaths("abc123")
+    val command = buildOpenCodeOnTheGoTerminalCommand(paths)
+
+    assertTrue(paths.allTransientPaths.all { it.startsWith("$BRIDGE_DIRECTORY/") })
+    assertTrue(paths.terminalUi.endsWith("terminal-abc123.xml"))
+    assertTrue(command.contains("uiautomator dump"))
+    assertTrue(command.contains("text=\"Terminal\""))
+    assertTrue(command.contains("input tap"))
+    assertTrue(command.contains("exit 73"))
+  }
+
+  @Test
   fun displaySizeParserUsesLastReportedOverride() {
     assertEquals(
       1080 to 2340,
