@@ -91,6 +91,7 @@ import com.google.ai.edge.gallery.tools.AskMcpToolCallPermissionAction
 import com.google.ai.edge.gallery.tools.AskSensitiveToolCallPermissionAction
 import com.google.ai.edge.gallery.tools.CallJsToolAction
 import com.google.ai.edge.gallery.tools.PermissionResult
+import com.google.ai.edge.gallery.tools.PublishToolImageAction
 import com.google.ai.edge.gallery.tools.RequestPermissionToolAction
 import com.google.ai.edge.gallery.tools.RuntimeToolDispatcher
 import com.google.ai.edge.gallery.tools.SkillProgressToolAction
@@ -473,6 +474,18 @@ fun AgentChatScreen(
             }
             is AskSensitiveToolCallPermissionAction -> {
               currentSensitivePermissionAction = action
+            }
+            is PublishToolImageAction -> {
+              agentTools.resultImageToShow =
+                com.google.ai.edge.gallery.tools.CallJsSkillResultImage(base64 = action.base64)
+              viewModel.updateCollapsableProgressPanelMessage(
+                model = currentModel,
+                title = "Screenshot captured",
+                inProgress = false,
+                doneIcon = doneIcon,
+                addItemTitle = "Visual test evidence",
+                addItemDescription = action.caption,
+              )
             }
           }
         }

@@ -165,10 +165,118 @@ class CodeOnTheGoToolTest {
     )
   }
 
+  @Test
+  fun unifiedPatchValidation_acceptsSourceAndRejectsSecretsTraversalAndBinaryContent() {
+    val accepted =
+      validateUnifiedPatch(
+        """
+        diff --git a/app/src/main/java/example/Test.kt b/app/src/main/java/example/Test.kt
+        index 1111111..2222222 100644
+        --- a/app/src/main/java/example/Test.kt
+        +++ b/app/src/main/java/example/Test.kt
+        @@ -1 +1 @@
+        -old
+        +new
+        """.trimIndent()
+      )
+
+    assertTrue(accepted.accepted)
+    assertEquals(listOf("app/src/main/java/example/Test.kt"), accepted.paths)
+    assertFalse(
+      validateUnifiedPatch(
+          "diff --git a/../secret b/../secret\nGIT binary patch"
+        )
+        .accepted
+    )
+    assertFalse(
+      validateUnifiedPatch(
+          "diff --git a/local.properties b/local.properties\n--- a/local.properties\n+++ b/local.properties"
+        )
+        .accepted
+    )
+  }
+
+  @Test
+  fun gitStatusParser_returnsOnlySafeChangedPaths() {
+    assertEquals(
+      setOf("app/src/main/A.kt", "app/src/main/New.kt"),
+      parseGitStatusPaths(" M app/src/main/A.kt\n?? app/src/main/New.kt\n?? ../outside"),
+    )
+  }
+
+  @Test
+  fun verifiedDevelopment_stagesOnlyReviewedPathsAndReturnsScreenshotEvidence() = runBlocking {
+    val baseline = "a".repeat(40)
+    val verified = "b".repeat(40)
+    val reviewedPath = "app/src/main/java/example/Test.kt"
+    val store = FakeDevelopmentSessionStore()
+    store.write(
+      JarvisDevelopmentSession(
+        id = "session123",
+        goal = "Change visible test marker",
+        branch = "jarvis-alpha-native-cortex",
+        baselineCommit = baseline,
+        startedAtEpochMs = 1L,
+        counterpartPackage = JARVIS_MAIN_PACKAGE,
+        changedPaths = listOf(reviewedPath),
+      )
+    )
+    val bridge =
+      FakeBridge(
+        commandResults =
+          listOf(
+            CodeOnTheGoCommandResult(
+              exitCode = 0,
+              output =
+                "__JARVIS_BRANCH__=jarvis-alpha-native-cortex\n" +
+                  "__JARVIS_HEAD__=$baseline\n__JARVIS_STATUS__\n M $reviewedPath",
+              error = "",
+            ),
+            CodeOnTheGoCommandResult(exitCode = 0, output = "BUILD SUCCESSFUL", error = ""),
+            CodeOnTheGoCommandResult(
+              exitCode = 0,
+              output = "__JARVIS_VERIFIED_COMMIT__=$verified",
+              error = "",
+            ),
+          )
+      )
+    val channel = Channel<ToolAction>(Channel.UNLIMITED)
+    val tool =
+      createTool(
+          currentPackageName = JARVIS_ALPHA_PACKAGE,
+          bridge = bridge,
+          developmentSessionStore = store,
+        )
+        .apply { onAttach(ToolExecutionContext(taskId = "test", actionChannel = channel)) }
+
+    val invocation =
+      async(Dispatchers.Default) {
+        tool.verifyUpdateAndPromptTestOtherJarvis(
+          prompt = "Reverse KO_SIVRAJ and reply with only the result.",
+          expectedText = "JARVIS_OK",
+          commitMessage = "Add verified capability",
+        )
+      }
+    val approval = channel.receive() as AskSensitiveToolCallPermissionAction
+    approval.result.complete(PermissionResult.ALLOW_ONCE)
+    val result = invocation.await()
+
+    assertEquals("succeeded", result["status"])
+    assertEquals(verified, result["verified_commit"])
+    assertEquals("true", result["expected_text_found"])
+    assertTrue(result[TOOL_RESULT_INPUT_IMAGE_DATA_URL].orEmpty().startsWith("data:image/jpeg;base64,"))
+    assertTrue(bridge.installCalled)
+    assertTrue(bridge.testCalled)
+    assertFalse(bridge.commands.last().contains("git add -A"))
+    assertTrue(bridge.commands.last().contains("git add -- '$reviewedPath'"))
+    assertEquals(verified, store.read()?.verifiedCommit)
+  }
+
   private fun createTool(
     currentPackageName: String = JARVIS_ALPHA_PACKAGE,
     bridge: FakeBridge = FakeBridge(),
     approvalMode: TerminalApprovalMode = TerminalApprovalMode.EVERY_COMMAND,
+    developmentSessionStore: JarvisDevelopmentSessionStore = FakeDevelopmentSessionStore(),
   ): CodeOnTheGoTool =
     CodeOnTheGoTool(
       currentPackageName = currentPackageName,
@@ -177,6 +285,7 @@ class CodeOnTheGoToolTest {
       bridge = bridge,
       selfAdbConnectionProvider = FakeSelfAdbConnectionProvider(),
       approvalModeStore = FakeApprovalModeStore(approvalMode),
+      developmentSessionStore = developmentSessionStore,
     )
 
   private class FakeCodeOnTheGoEnvironment : CodeOnTheGoEnvironment {
@@ -213,12 +322,32 @@ class CodeOnTheGoToolTest {
     ): SelfAdbConnectionResult = checkConnection()
   }
 
-  private class FakeBridge(private val commandOutput: String = "") : CodeOnTheGoBridge {
+  private class FakeDevelopmentSessionStore : JarvisDevelopmentSessionStore {
+    private var session: JarvisDevelopmentSession? = null
+
+    override fun read(): JarvisDevelopmentSession? = session
+
+    override fun write(session: JarvisDevelopmentSession) {
+      this.session = session
+    }
+
+    override fun clear() {
+      session = null
+    }
+  }
+
+  private class FakeBridge(
+    private val commandOutput: String = "",
+    commandResults: List<CodeOnTheGoCommandResult> = emptyList(),
+  ) : CodeOnTheGoBridge {
+    private val queuedCommandResults = commandResults.toMutableList()
     var executeCalled = false
     var installCalled = false
+    var testCalled = false
     var lastCommand = ""
     var lastSerial = ""
     var lastInstallPackage = ""
+    val commands = mutableListOf<String>()
 
     override suspend fun execute(
       command: String,
@@ -229,7 +358,9 @@ class CodeOnTheGoToolTest {
       executeCalled = true
       lastCommand = command
       lastSerial = serial
-      return CodeOnTheGoCommandResult(exitCode = 0, output = commandOutput, error = "")
+      commands += command
+      return if (queuedCommandResults.isNotEmpty()) queuedCommandResults.removeAt(0)
+      else CodeOnTheGoCommandResult(exitCode = 0, output = commandOutput, error = "")
     }
 
     override suspend fun install(
@@ -239,7 +370,45 @@ class CodeOnTheGoToolTest {
     ): CodeOnTheGoInstallResult {
       installCalled = true
       lastInstallPackage = targetPackageName
-      return CodeOnTheGoInstallResult(succeeded = true, output = "Success", error = "")
+      return CodeOnTheGoInstallResult(
+        succeeded = true,
+        output = "Success",
+        error = "",
+        backupApkPath = "/sdcard/Download/AndroidJarvisEvidence/backup.apk",
+      )
     }
+
+    override suspend fun testCounterpart(
+      targetPackageName: String,
+      deepLinkScheme: String,
+      prompt: String,
+      expectedText: String,
+      serial: String,
+      returnPackageName: String,
+      timeoutMs: Long,
+    ): JarvisPromptTestResult =
+      JarvisPromptTestResult(
+        launched = true,
+        processRunning = true,
+        expectedTextFound = true,
+        fatalCrashDetected = false,
+        screenshotBase64 = "c2NyZWVuc2hvdA==",
+        screenshotPath = "/sdcard/Download/AndroidJarvisEvidence/test.png",
+        screenshotSha256 = "a".repeat(64),
+        logcatErrors = "",
+        error = "",
+      ).also { testCalled = true }
+
+    override suspend fun restoreBackup(
+      backupApkPath: String,
+      targetPackageName: String,
+      serial: String,
+    ): CodeOnTheGoInstallResult =
+      CodeOnTheGoInstallResult(
+        succeeded = true,
+        output = "Success",
+        error = "",
+        backupApkPath = backupApkPath,
+      )
   }
 }

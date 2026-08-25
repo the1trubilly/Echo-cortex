@@ -58,6 +58,7 @@ class OpenAiApiClientTest {
     val userContent = input[0].jsonObject.getValue("content").jsonArray
     assertEquals("input_text", userContent[0].jsonObject.getValue("type").jsonPrimitive.content)
     assertEquals("input_image", userContent[1].jsonObject.getValue("type").jsonPrimitive.content)
+    assertEquals("auto", userContent[1].jsonObject.getValue("detail").jsonPrimitive.content)
     assertEquals("assistant", input[1].jsonObject.getValue("role").jsonPrimitive.content)
     assertEquals("A test image.", input[1].jsonObject.getValue("content").jsonPrimitive.content)
   }

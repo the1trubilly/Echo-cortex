@@ -105,6 +105,8 @@ data class TermuxCommandResult(
   val stdoutTruncated: Boolean,
   val stderrTruncated: Boolean,
   val timedOut: Boolean = false,
+  /** Bounded host-only output used for binary-safe chunk transport, never returned to the model. */
+  internal val fullStdout: String = stdout,
 ) {
   val succeeded: Boolean
     get() = !timedOut && internalErrorCode == Activity.RESULT_OK && exitCode == 0
@@ -134,6 +136,7 @@ data class TermuxCommandResult(
           bundle.getString(TermuxRunCommandContract.EXTRA_ERROR_MESSAGE).orEmpty().limitForModel(),
         stdoutTruncated = stdoutOriginalLength > stdout.length || stdout.length > MAX_MODEL_CHARS,
         stderrTruncated = stderrOriginalLength > stderr.length || stderr.length > MAX_MODEL_CHARS,
+        fullStdout = stdout.take(MAX_INTERNAL_OUTPUT_CHARS),
       )
     }
 
@@ -292,6 +295,7 @@ private const val PREFIX = "\$PREFIX"
 const val DEFAULT_TERMUX_TIMEOUT_MS = 60_000L
 internal const val TERMUX_TMUX_SESSION = "android-jarvis"
 private const val MAX_MODEL_CHARS = 16_000
+private const val MAX_INTERNAL_OUTPUT_CHARS = 96_000
 
 private fun String.limitForModel(): String {
   if (length <= MAX_MODEL_CHARS) return this

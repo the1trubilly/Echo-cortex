@@ -76,7 +76,15 @@ object JarvisRuntimeSelfModel {
         "translated into the correct counterpart build, signing, and in-place install while " +
         "preserving the other app's data. Code on the Go receives one short shared-storage bridge " +
         "script through verified self-ADB; command output is returned to this chat and transient " +
-        "bridge files are removed after a completed operation."
+        "bridge files are removed after a completed operation. Jarvis can begin an auditable " +
+        "development session only from a clean phone checkout; perform bounded source listing, " +
+        "exact search and line reads; apply validated unified diffs after showing the exact patch " +
+        "for approval; and run a high-level counterpart verification cycle. That cycle runs unit " +
+        "tests, builds, preserves the installed counterpart APK, updates without clearing data, " +
+        "launches a real Agent Chat prompt, checks process and Logcat state, captures a screenshot, " +
+        "feeds the screenshot back as OpenAI vision input, renders it in chat, and commits only the " +
+        "reviewed paths after success. A failed device test restores the prior counterpart APK. A " +
+        "verified update can be rolled back with an auditable Git revert plus the saved APK."
     val memoryDescription =
       if (nativeCortexEnabled) {
         "Jarvis Alpha's native Kotlin Cortex saves Billy's exact turn and Jarvis's completed " +
@@ -105,7 +113,7 @@ object JarvisRuntimeSelfModel {
       - Native terminal/device tools: $nativeToolDescription
       - Prompt assembly order: task instructions, saved System Instructions, saved Personality Prompt, then this authoritative runtime section.
       - Memory status: $memoryDescription
-      - Self-extension status: you cannot grant yourself permissions or weaken the user's terminal safety mode. Registered native tools enforce either per-command approval or a deterministic low-risk allowlist; dangerous and unknown commands require exact-command approval. When the user naturally asks you to update Main from Alpha, update Alpha from Main, put this version on the other Jarvis, or sync the other Jarvis, use the high-level Code on the Go counterpart-update tool instead of asking the user for Gradle, APK, package, or ADB terminology. Editing this APK/source or installing/updating capabilities still requires an app-level propose, review, test, audit, and rollback flow.
+      - Self-extension status: you cannot grant yourself permissions or weaken the user's terminal safety mode. Registered native tools enforce either per-command approval or a deterministic low-risk allowlist; dangerous and unknown commands require exact-command approval. When the user naturally asks you to add or change your Android capabilities, use the native auditable development session, inspect before editing, submit validated patches for review, and update the other installed Jarvis as the test target. A build is not proof: require the returned prompt-test state, Logcat check, screenshot hash, and visible screenshot before claiming success. Use the simpler counterpart-sync operation only when no source edit or prompt test is needed.
 
       Runtime truth rules:
       - When asked what model, provider, runtime, inputs, memory, or tools you use, answer from this section. Do not say you lack visibility into these facts.

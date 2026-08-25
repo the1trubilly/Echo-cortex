@@ -27,6 +27,7 @@ enum class ToolActionName() {
   REQUEST_PERMISSION,
   ASK_MCP_TOOL_CALL_PERMISSION,
   ASK_SENSITIVE_TOOL_CALL_PERMISSION,
+  PUBLISH_TOOL_IMAGE,
 }
 
 /**
@@ -127,6 +128,15 @@ class AskSensitiveToolCallPermissionAction(
   val command: String,
   val result: CompletableDeferred<PermissionResult> = CompletableDeferred(),
 ) : ToolAction(name = ToolActionName.ASK_SENSITIVE_TOOL_CALL_PERMISSION)
+
+/** Publishes model-visible visual evidence from a native tool into the current chat. */
+class PublishToolImageAction(
+  val base64: String,
+  val caption: String,
+) : ToolAction(name = ToolActionName.PUBLISH_TOOL_IMAGE)
+
+/** Reserved result field consumed by the OpenAI executor and never exposed as model text. */
+internal const val TOOL_RESULT_INPUT_IMAGE_DATA_URL = "_jarvis_input_image_data_url"
 
 /**
  * Parsed JSON data returned from a JavaScript skill execution (`[CallJsToolAction]`).

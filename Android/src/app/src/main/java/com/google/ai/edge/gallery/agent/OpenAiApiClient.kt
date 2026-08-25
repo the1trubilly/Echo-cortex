@@ -25,6 +25,7 @@ data class OpenAiConversationMessage(
   val role: String,
   val text: String,
   val imageDataUrls: List<String> = emptyList(),
+  val imageDetail: String = "auto",
 )
 
 data class OpenAiResponseRequest(
@@ -58,6 +59,7 @@ internal object OpenAiInputJson {
                 buildJsonObject {
                   put("type", "input_image")
                   put("image_url", imageDataUrl)
+                  put("detail", message.imageDetail)
                 }
               )
             }

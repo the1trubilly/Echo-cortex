@@ -492,8 +492,8 @@ fun GalleryNavHost(
     intent.data = null
     val uriStr = data.toString()
     Log.d(TAG, "navigation link clicked: $data")
-    // 1. Precise model deep links: com.google.ai.edge.gallery://model/<taskId>/<modelName>
-    if (uriStr.startsWith("com.google.ai.edge.gallery://model/")) {
+    // 1. Precise model deep links for both independently installed Main and Alpha packages.
+    if (data.host == "model" && data.scheme in JARVIS_DEEP_LINK_SCHEMES) {
       if (data.pathSegments.size >= 2) {
         val taskId = data.pathSegments.get(data.pathSegments.size - 2)
         val modelName = data.pathSegments.last()
@@ -542,6 +542,9 @@ fun GalleryNavHost(
     }
   }
 }
+
+private val JARVIS_DEEP_LINK_SCHEMES =
+  setOf("com.google.ai.edge.gallery", "com.google.ai.edge.gallery.alpha")
 
 @Composable
 private fun CustomTaskScreen(
