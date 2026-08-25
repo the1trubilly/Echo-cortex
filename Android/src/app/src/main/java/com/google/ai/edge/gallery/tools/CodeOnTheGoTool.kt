@@ -274,12 +274,8 @@ class CodeOnTheGoTool internal constructor(
       if (!validation.accepted) return@runBlocking errorResult(validation.message)
       val encoded =
         Base64.getEncoder().encodeToString(patch.toByteArray(StandardCharsets.UTF_8))
-      val patchPath = "\$PREFIX/tmp/jarvis-${session.id}.diff"
-      val command =
-        "mkdir -p \$PREFIX/tmp; trap 'rm -f ${patchPath}' EXIT; " +
-          "printf '%s' ${encoded.shellSingleQuote()} | base64 -d > ${patchPath}; " +
-          "git apply --check ${patchPath} && git apply ${patchPath} && git diff --check && " +
-          "git status --short"
+      val patchPath = "$BRIDGE_DIRECTORY/patch-${session.id}.diff"
+      val command = buildApplyJarvisPatchCommand(encoded, patchPath, validation.paths)
       val approvalText =
         buildString {
           append("Apply Jarvis source patch: ").append(normalizedSummary)
@@ -1054,6 +1050,24 @@ private const val DEVELOPMENT_STATUS_COMMAND =
   "printf '__JARVIS_BRANCH__=%s\\n' \"\$(git branch --show-current)\"; " +
     "printf '__JARVIS_HEAD__=%s\\n' \"\$(git rev-parse HEAD)\"; " +
     "printf '__JARVIS_STATUS__\\n'; git status --porcelain=v1 --untracked-files=all"
+
+internal fun buildApplyJarvisPatchCommand(
+  encodedPatch: String,
+  patchPath: String,
+  reviewedPaths: List<String>,
+): String {
+  val reviewedPathArguments = reviewedPaths.joinToString(" ") { it.shellSingleQuote() }
+  return "trap ${"rm -f ${patchPath.shellSingleQuote()}".shellSingleQuote()} EXIT; " +
+    "printf '%s' ${encodedPatch.shellSingleQuote()} | base64 -d > ${patchPath.shellSingleQuote()} " +
+    "|| exit 74; " +
+    "git apply --check ${patchPath.shellSingleQuote()} || exit \$?; " +
+    "git apply ${patchPath.shellSingleQuote()} || exit \$?; " +
+    "git diff --check || exit \$?; " +
+    "jarvis_changed=\"\$(git status --porcelain=v1 -- $reviewedPathArguments)\"; " +
+    "if [ -z \"\$jarvis_changed\" ]; then " +
+    "printf 'PATCH_DID_NOT_CHANGE_REVIEWED_PATHS\\n' >&2; exit 74; fi; " +
+    "printf '%s\\n' \"\$jarvis_changed\""
+}
 
 data class CodeOnTheGoEnvironmentStatus(
   val installed: Boolean,

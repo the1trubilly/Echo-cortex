@@ -210,6 +210,20 @@ class CodeOnTheGoToolTest {
   }
 
   @Test
+  fun patchApplicationRequiresAChangedReviewedPath() {
+    val command =
+      buildApplyJarvisPatchCommand(
+        encodedPatch = "cGF0Y2g=",
+        patchPath = "$BRIDGE_DIRECTORY/patch-test.diff",
+        reviewedPaths = listOf("app/src/main/Test.kt"),
+      )
+
+    assertTrue(command.contains("PATCH_DID_NOT_CHANGE_REVIEWED_PATHS"))
+    assertTrue(command.contains("git status --porcelain=v1 -- 'app/src/main/Test.kt'"))
+    assertTrue(command.contains("'/sdcard/Download/AndroidJarvisBridge/patch-test.diff'"))
+  }
+
+  @Test
   fun gitStatusParser_returnsOnlySafeChangedPaths() {
     assertEquals(
       setOf("app/src/main/A.kt", "app/src/main/New.kt"),
