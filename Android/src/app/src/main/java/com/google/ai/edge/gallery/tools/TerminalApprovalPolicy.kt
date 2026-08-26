@@ -86,6 +86,10 @@ internal object TerminalCommandSafetyPolicy {
       Regex("^tmux\\s+(?:ls|list-sessions)$"),
       Regex("^tmux\\s+display-message\\s+-p\\s+'#S'$"),
       Regex("^adb\\s+(?:version|get-state|devices(?:\\s+-l)?)$"),
+      Regex("^git(?:\\s+-C\\s+$OUTPUT_ARGUMENT)?\\s+(?:add|branch\\s+--show-current|commit|diff|fetch|log|rev-parse|show|status)(?:\\s+$OUTPUT_ARGUMENT)*$"),
+      Regex("(?i)^(?!.*(?:install|uninstall|publish|upload|wrapper))(?:jarvis-gradle|(?:\\./)?gradlew)(?:\\s+$OUTPUT_ARGUMENT)*$"),
+      Regex("^tmux\\s+(?:capture-pane|display-message|has-session|list-panes|list-sessions|list-windows|ls|rename-window|select-window)(?:\\s+$OUTPUT_ARGUMENT)*$"),
+      Regex("^(?:grep|rg|find|head|tail|stat|du|wc|file|readlink|realpath|pgrep|ps)(?:\\s+$OUTPUT_ARGUMENT)*$"),
     )
 
   fun requiresApproval(command: String): Boolean {

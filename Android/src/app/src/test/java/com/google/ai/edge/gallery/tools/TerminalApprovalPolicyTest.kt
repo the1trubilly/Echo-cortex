@@ -31,6 +31,10 @@ class TerminalApprovalPolicyTest {
         "ls -la",
         "command -v adb",
         "tmux list-sessions",
+        "tmux capture-pane -p -t android-jarvis:build",
+        "git -C /tmp/repo status --short",
+        "jarvis-gradle assembleAlpha",
+        "find app/src -type f",
         "adb version",
         "adb devices -l",
       )
@@ -50,6 +54,9 @@ class TerminalApprovalPolicyTest {
         "echo \$(whoami)",
         "adb shell input tap 1 1",
         "adb install app.apk",
+        "git push origin main",
+        "jarvis-gradle installDebug",
+        "tmux send-keys -t build 'rm -rf app' Enter",
         "unknown-command",
       )
       .forEach { command ->
