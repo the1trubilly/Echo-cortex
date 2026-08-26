@@ -25,7 +25,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 private object OpenAiSessionMarker
-private const val MAX_TOOL_ROUNDS = 12
 
 private data class OpenAiFunctionCall(
   val callId: String,
@@ -117,14 +116,13 @@ constructor(
           val toolManager = ToolManager(agentTools.getLiteRtToolProviders())
           val openAiTools = OpenAiToolJson.fromLiteRtDescriptions(toolManager.getToolsDescription())
           val visibleText = StringBuilder()
-          var completedTurn = false
           val recallContext =
             (request.metadata[AgentRequest.CORTEX_RECALL_CONTEXT] as? String).orEmpty()
           val turnInstructions =
             if (recallContext.isBlank()) systemInstruction
             else "$systemInstruction\n\n$recallContext"
 
-          toolLoop@ for (round in 0 until MAX_TOOL_ROUNDS) {
+          while (true) {
             val requestItems = synchronized(conversationItems) { conversationItems.toList() }
             val response =
               apiClient.streamResponse(
@@ -156,10 +154,7 @@ constructor(
             synchronized(conversationItems) { conversationItems.addAll(outputItems) }
 
             val functionCalls = response.outputItems.mapNotNull(::parseFunctionCall)
-            if (functionCalls.isEmpty()) {
-              completedTurn = true
-              break@toolLoop
-            }
+            if (functionCalls.isEmpty()) break
 
             functionCalls.forEach { functionCall ->
               val execution = executeToolCall(toolManager, functionCall)
@@ -175,11 +170,6 @@ constructor(
             }
           }
 
-          if (!completedTurn) {
-            throw IllegalStateException(
-              "Jarvis stopped after $MAX_TOOL_ROUNDS tool steps to prevent a runaway loop."
-            )
-          }
 
           val finalText = visibleText.toString()
           trySend(AgentEvent.StreamToken(token = "", done = true))

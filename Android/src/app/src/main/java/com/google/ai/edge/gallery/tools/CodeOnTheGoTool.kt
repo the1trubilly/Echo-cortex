@@ -206,10 +206,7 @@ class CodeOnTheGoTool internal constructor(
         ?: return@runBlocking errorResult("Unsafe or unsupported repository path.")
       val encoded =
         Base64.getEncoder().encodeToString(normalizedQuery.toByteArray(StandardCharsets.UTF_8))
-      val command =
-        "jarvis_query=\"\$(printf '%s' ${encoded.shellSingleQuote()} | base64 -d)\"; " +
-          "rg -n --fixed-strings --glob '!**/build/**' -- \"\$jarvis_query\" " +
-          "${safePath.shellSingleQuote()} | head -n $MAX_SEARCH_RESULTS"
+      val command = buildSearchJarvisSourceCommand(encoded, safePath, MAX_SEARCH_RESULTS)
       executeCodeCommand(
           displayName = "Search Jarvis source",
           approvalText = "Search $safePath for: $normalizedQuery",
@@ -995,7 +992,7 @@ internal fun parseGitStatusPaths(status: String): Set<String> =
     .mapNotNull { line ->
       if (line.length < 4) return@mapNotNull null
       val rawPath = line.substring(3).substringAfterLast(" -> ").trim().trim('"')
-      validateRepositoryPath(rawPath, requireFile = true)
+      validateRepositoryPath(rawPath, requireFile = true)?.removePrefix(CODE_ON_THE_GO_GIT_PREFIX)
     }
     .toSet()
 
@@ -1038,6 +1035,7 @@ private fun JarvisPromptTestResult.toToolResult(
   }
 
 private const val MAX_PATCH_BYTES = 32_000
+private const val CODE_ON_THE_GO_GIT_PREFIX = "Android/src/"
 private val DIFF_HEADER = Regex("(?m)^diff --git a/([^\\s]+) b/([^\\s]+)$")
 private val SAFE_REPOSITORY_PATH = Regex("^[A-Za-z0-9._+/-]+$")
 private val GIT_COMMIT = Regex("^[0-9a-fA-F]{40,64}$")
@@ -1664,8 +1662,28 @@ internal fun buildOpenCodeOnTheGoTerminalCommand(paths: CodeOnTheGoBridgePaths):
     "jarvis_bounds=\"\$(grep -o 'text=\"Terminal\"[^>]*bounds=\"\\[[0-9,]*\\]\\[[0-9,]*\\]\"' " +
     "${paths.terminalUi.shellSingleQuote()} | head -n 1 | grep -o '[0-9][0-9]*' | tr '\\n' ' ')\"; " +
     "set -- \$jarvis_bounds; " +
-    "if [ \"\$#\" -ne 4 ]; then printf 'Terminal button was not visible.\\n' >&2; exit 73; fi; " +
-    "input tap \$(( (\$1 + \$3) / 2 )) \$(( (\$2 + \$4) / 2 ))"
+    "if [ \"\$#\" -eq 4 ]; then " +
+    "input tap \$(( (\$1 + \$3) / 2 )) \$(( (\$2 + \$4) / 2 )); " +
+    "elif [ \"\$#\" -ne 0 ]; then " +
+    "printf 'Terminal navigation bounds were malformed.\\n' >&2; exit 73; " +
+    "fi"
+
+internal fun buildSearchJarvisSourceCommand(
+  encodedQuery: String,
+  safePath: String,
+  maxResults: Int,
+): String =
+  "jarvis_query=\"\$(printf '%s' ${encodedQuery.shellSingleQuote()} | base64 -d)\"; " +
+    "jarvis_results=\"\$(mktemp)\" || exit \$?; " +
+    "trap 'rm -f \"\$jarvis_results\"' EXIT; " +
+    "if command -v rg >/dev/null 2>&1; then " +
+    "rg -n --fixed-strings --glob '!**/build/**' --glob '!**/.git/**' -- " +
+    "\"\$jarvis_query\" ${safePath.shellSingleQuote()} >\"\$jarvis_results\"; " +
+    "else grep -R -n -I -F --exclude-dir=build --exclude-dir=.git -- " +
+    "\"\$jarvis_query\" ${safePath.shellSingleQuote()} >\"\$jarvis_results\"; fi; " +
+    "jarvis_status=\$?; " +
+    "head -n $maxResults \"\$jarvis_results\"; " +
+    "exit \"\$jarvis_status\""
 
 internal fun buildCodeOnTheGoRequestScript(
   command: String,

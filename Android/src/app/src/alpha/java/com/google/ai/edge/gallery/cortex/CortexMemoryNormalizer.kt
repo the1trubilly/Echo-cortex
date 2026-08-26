@@ -4,6 +4,7 @@ package com.google.ai.edge.gallery.cortex
 internal data class CortexNormalizationMetadata(
   val version: Int,
   val title: String,
+  val cavemanMvnSummary: String,
   val statementKind: String,
   val temporalStatus: String,
   val modality: String,
@@ -13,11 +14,11 @@ internal data class CortexNormalizationMetadata(
 )
 
 /**
- * Deterministic, rebuildable normalization only. It classifies routing hooks and never rewrites,
- * summarizes, confirms, or supersedes the exact Markdown source.
+ * Deterministic, rebuildable normalization only. It classifies routing hooks and creates a bounded
+ * navigation preview; it never rewrites, confirms, or supersedes the exact Markdown source.
  */
 internal object CortexMemoryNormalizer {
-  const val VERSION = 1
+  const val VERSION = 2
 
   private val correctionPattern =
     Regex(
@@ -82,14 +83,8 @@ internal object CortexMemoryNormalizer {
         hypotheticalPattern.containsMatchIn(trimmed) -> "hypothetical_or_uncertain"
         else -> "user_asserted"
       }
-    val title =
-      trimmed
-        .lineSequence()
-        .firstOrNull(String::isNotBlank)
-        ?.replace(Regex("\\s+"), " ")
-        ?.take(120)
-        .orEmpty()
-        .ifBlank { "Untitled memory" }
+    val title = representativeTitle(trimmed, recallMetadata.conceptTerms)
+    val cavemanMvnSummary = cavemanMvnSummary(trimmed)
     val projectionHash =
       CortexHashing.sha256(
         listOf(
@@ -100,12 +95,15 @@ internal object CortexMemoryNormalizer {
             modality,
             correctionCue.toString(),
             recallMetadata.conceptTerms.joinToString("|"),
+            title,
+            cavemanMvnSummary,
           )
           .joinToString("\n")
       )
     return CortexNormalizationMetadata(
       version = VERSION,
       title = title,
+      cavemanMvnSummary = cavemanMvnSummary,
       statementKind = statementKind,
       temporalStatus = temporalStatus,
       modality = modality,
@@ -114,4 +112,69 @@ internal object CortexMemoryNormalizer {
       projectionHash = projectionHash,
     )
   }
+
+  /** A deterministic LOD0 topic label. It is navigation metadata, never source truth. */
+  fun representativeTitle(content: String, conceptTerms: Collection<String>): String {
+    val concepts =
+      conceptTerms
+        .asSequence()
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .distinct()
+        .take(MAX_TITLE_CONCEPTS)
+        .map(::displayConcept)
+        .toList()
+    if (concepts.isNotEmpty()) return concepts.joinToString(" · ").take(MAX_TITLE_CHARS)
+
+    return content
+      .lineSequence()
+      .map(String::trim)
+      .firstOrNull(String::isNotBlank)
+      ?.replace(Regex("^([#>*-]|\\d+[.)])\\s*"), "")
+      ?.replace(Regex("\\s+"), " ")
+      ?.trim()
+      ?.take(MAX_TITLE_CHARS)
+      .orEmpty()
+      .ifBlank { "Untitled memory" }
+  }
+
+  /**
+   * Minimum Viable Nuance means bounded but not de-qualified: negation, uncertainty, correction,
+   * and the ending are retained. This is a deterministic preview, not an adjudicated summary.
+   */
+  fun cavemanMvnSummary(content: String): String {
+    val compact =
+      content
+        .lineSequence()
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .joinToString(" ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+    if (compact.isBlank()) return "No readable memory content."
+    if (compact.length <= MAX_MVN_CHARS) return compact
+
+    val marker = " … "
+    val available = MAX_MVN_CHARS - marker.length
+    val headLength = (available * 2) / 3
+    return compact.take(headLength).trimEnd() +
+      marker +
+      compact.takeLast(available - headLength).trimStart()
+  }
+
+  private fun displayConcept(concept: String): String =
+    concept
+      .replace('_', ' ')
+      .split(' ')
+      .filter(String::isNotBlank)
+      .joinToString(" ") { word ->
+        when (word.lowercase()) {
+          "adb", "ai", "lod0", "mvn" -> word.uppercase()
+          else -> word.lowercase().replaceFirstChar(Char::titlecase)
+        }
+      }
+
+  private const val MAX_TITLE_CONCEPTS = 5
+  private const val MAX_TITLE_CHARS = 120
+  private const val MAX_MVN_CHARS = 320
 }

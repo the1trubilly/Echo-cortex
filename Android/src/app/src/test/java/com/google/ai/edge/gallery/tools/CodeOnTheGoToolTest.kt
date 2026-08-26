@@ -158,7 +158,7 @@ class CodeOnTheGoToolTest {
   }
 
   @Test
-  fun terminalNavigationUsesVisibleLabelBounds() {
+  fun terminalNavigationTapsFourBoundsAcceptsZeroAndRejectsMalformedCounts() {
     val paths = CodeOnTheGoBridgePaths("abc123")
     val command = buildOpenCodeOnTheGoTerminalCommand(paths)
 
@@ -166,8 +166,43 @@ class CodeOnTheGoToolTest {
     assertTrue(paths.terminalUi.endsWith("terminal-abc123.xml"))
     assertTrue(command.contains("uiautomator dump"))
     assertTrue(command.contains("text=\"Terminal\""))
-    assertTrue(command.contains("input tap"))
-    assertTrue(command.contains("exit 73"))
+    assertTrue(command.contains("if [ \"\$#\" -eq 4 ]; then input tap"))
+    assertTrue(command.contains("elif [ \"\$#\" -ne 0 ]; then"))
+    assertTrue(command.contains("Terminal navigation bounds were malformed.\\n"))
+    assertTrue(command.contains("malformed.\\n' >&2; exit 73; fi"))
+    assertFalse(command.contains("Terminal button was not visible."))
+  }
+
+  @Test
+  fun sourceSearchCommandUsesRgOrSafeGrepAndPreservesSearchStatus() {
+    val command =
+      buildSearchJarvisSourceCommand(
+        encodedQuery = "TkVFRExF",
+        safePath = "app/src/main",
+        maxResults = 200,
+      )
+
+    assertTrue(command.contains("command -v rg >/dev/null 2>&1"))
+    assertTrue(command.contains("rg -n --fixed-strings"))
+    assertTrue(command.contains("--glob '!**/build/**'"))
+    assertTrue(command.contains("--glob '!**/.git/**'"))
+    assertTrue(command.contains("grep -R -n -I -F"))
+    assertTrue(command.contains("--exclude-dir=build"))
+    assertTrue(command.contains("--exclude-dir=.git"))
+    assertTrue(command.contains("jarvis_results=\"\$(mktemp)\" || exit \$?"))
+    assertTrue(command.contains("trap 'rm -f \"\$jarvis_results\"' EXIT"))
+    assertTrue(command.indexOf("jarvis_status=\$?") < command.indexOf("head -n 200"))
+    assertTrue(command.endsWith("exit \"\$jarvis_status\""))
+  }
+
+  @Test
+  fun repositoryPathValidationRejectsUnsafeAndGeneratedSearchRoots() {
+    assertEquals("app/src/main", validateRepositoryPath("app/src/main", requireFile = false))
+    assertEquals(null, validateRepositoryPath("/app/src/main", requireFile = false))
+    assertEquals(null, validateRepositoryPath("../app/src/main", requireFile = false))
+    assertEquals(null, validateRepositoryPath("app/.git", requireFile = false))
+    assertEquals(null, validateRepositoryPath("app/build", requireFile = false))
+    assertEquals(null, validateRepositoryPath("app/src;echo unsafe", requireFile = false))
   }
 
   @Test
@@ -228,6 +263,14 @@ class CodeOnTheGoToolTest {
     assertEquals(
       setOf("app/src/main/A.kt", "app/src/main/New.kt"),
       parseGitStatusPaths(" M app/src/main/A.kt\n?? app/src/main/New.kt\n?? ../outside"),
+    )
+  }
+
+  @Test
+  fun gitStatusParser_normalizesCodeWorkspacePrefix() {
+    assertEquals(
+      setOf("app/src/main/A.kt"),
+      parseGitStatusPaths(" M Android/src/app/src/main/A.kt"),
     )
   }
 

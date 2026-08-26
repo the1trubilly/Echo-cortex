@@ -31,6 +31,9 @@ class CortexMemoryNormalizerTest {
     assertFalse(olderNormalization.correctionCue)
     assertTrue(newerNormalization.correctionCue)
     assertEquals("correction_candidate", newerNormalization.statementKind)
+    assertTrue(newerNormalization.title.contains("Lighthouse"))
+    assertTrue(newerNormalization.cavemanMvnSummary.contains("not blue"))
+    assertTrue(newerNormalization.cavemanMvnSummary.contains("Actually"))
     assertEquals("current_time_cue", newerNormalization.temporalStatus)
     val sidecar =
       CortexMarkdownCodec.encodeNormalizationSidecar(
@@ -49,6 +52,8 @@ class CortexMemoryNormalizerTest {
     assertTrue(sidecar.contains("source_was_modified: false"))
     assertTrue(sidecar.contains("authority_ceiling: inform_only"))
     assertTrue(sidecar.contains("correction_cue: true"))
+    assertTrue(sidecar.contains("## LOD0 memory handle"))
+    assertTrue(sidecar.contains("Caveman Minimum Viable Nuance"))
 
     val relationFromNewer =
       CortexTypedRelation(
@@ -102,6 +107,9 @@ class CortexMemoryNormalizerTest {
       )
     assertEquals(setOf("newer", "older"), selected.map { it.candidate.artifactId }.toSet())
     val context = CortexRecallEngine.buildModelContext(selected)
+    assertTrue(context.contains("caveman_mvn_summary"))
+    assertTrue(context.contains("lod_guide"))
+    assertTrue(context.contains("zoom_policy"))
     assertTrue(context.contains(olderText))
     assertTrue(context.contains(newerText))
     assertTrue(context.contains("POSSIBLY_CORRECTS"))
